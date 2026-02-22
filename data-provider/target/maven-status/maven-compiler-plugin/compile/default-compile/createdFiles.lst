@@ -1,0 +1,5 @@
+io/mars/lite/order/OrderRepositoryImpl.class
+io/mars/lite/order/OrderItemEntity.class
+io/mars/lite/order/OrderEntity.class
+io/mars/lite/configuration/DataSourceConfiguration.class
+io/mars/lite/order/OrderJpaRepository.class

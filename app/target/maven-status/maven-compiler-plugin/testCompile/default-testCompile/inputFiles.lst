@@ -1,0 +1,5 @@
+/Users/mac/Projects/mars-enterprise-kit-lite/app/src/test/java/io/mars/lite/AbstractIntegrationTest.java
+/Users/mac/Projects/mars-enterprise-kit-lite/app/src/test/java/io/mars/lite/api/chaos/ChaosControllerE2ETest.java
+/Users/mac/Projects/mars-enterprise-kit-lite/app/src/test/java/io/mars/lite/api/chaos/PhantomEventChaosAspectTest.java
+/Users/mac/Projects/mars-enterprise-kit-lite/app/src/test/java/io/mars/lite/api/order/OrderControllerE2ETest.java
+/Users/mac/Projects/mars-enterprise-kit-lite/app/src/test/java/io/mars/lite/api/order/OrderServiceIntegrationTest.java

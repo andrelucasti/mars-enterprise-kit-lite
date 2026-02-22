@@ -1,0 +1,79 @@
+### Health Check
+GET http://localhost:8082/actuator/health
+
+###
+
+### Create Order
+POST http://localhost:8082/orders
+Content-Type: application/json
+
+{
+  "customerId": "550e8400-e29b-41d4-a716-446655440000",
+  "items": [
+    {
+      "productId": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+      "quantity": 2,
+      "unitPrice": 149.95
+    }
+  ]
+}
+
+###
+
+### Create Order — Multiple Items
+POST http://localhost:8082/orders
+Content-Type: application/json
+
+{
+  "customerId": "550e8400-e29b-41d4-a716-446655440001",
+  "items": [
+    {
+      "productId": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+      "quantity": 1,
+      "unitPrice": 299.99
+    },
+    {
+      "productId": "7ba7b810-9dad-11d1-80b4-00c04fd430c9",
+      "quantity": 3,
+      "unitPrice": 49.90
+    }
+  ]
+}
+
+###
+
+### Get Order by ID
+# Replace {orderId} with a real UUID from a Create Order response
+GET http://localhost:8082/orders/00000000-0000-0000-0000-000000000000
+
+###
+
+### Create Order — Validation Error (missing customerId)
+POST http://localhost:8082/orders
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "productId": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+      "quantity": 1,
+      "unitPrice": 10.00
+    }
+  ]
+}
+
+###
+
+### Create Order — Validation Error (empty items)
+POST http://localhost:8082/orders
+Content-Type: application/json
+
+{
+  "customerId": "550e8400-e29b-41d4-a716-446655440000",
+  "items": []
+}
+
+###
+
+### Get Order — Not Found
+GET http://localhost:8082/orders/00000000-0000-0000-0000-000000000000

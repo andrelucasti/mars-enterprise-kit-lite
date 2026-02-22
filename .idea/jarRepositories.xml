@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="RemoteRepositoriesConfiguration">
+    <remote-repository>
+      <option name="id" value="TMLSnapshot" />
+      <option name="name" value="TMLSnapshot" />
+      <option name="url" value="http://localhost:8081/repository/maven-snapshots" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="central" />
+      <option name="name" value="Central Repository" />
+      <option name="url" value="https://repo.maven.apache.org/maven2" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="TMLThirdParty" />
+      <option name="name" value="TMLThirdParty" />
+      <option name="url" value="http://localhost:8081/repository/maven-thirdparty" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="TMLCentral" />
+      <option name="name" value="TMLCentral" />
+      <option name="url" value="http://localhost:8081/repository/maven-central" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="TMLRepository" />
+      <option name="name" value="TMLRepository" />
+      <option name="url" value="http://localhost:8081/repository/maven-releases" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="central" />
+      <option name="name" value="Maven Central repository" />
+      <option name="url" value="https://repo1.maven.org/maven2" />
+    </remote-repository>
+    <remote-repository>
+      <option name="id" value="jboss.community" />
+      <option name="name" value="JBoss Community repository" />
+      <option name="url" value="https://repository.jboss.org/nexus/content/repositories/public/" />
+    </remote-repository>
+  </component>
+</project>
