@@ -23,7 +23,11 @@ public class KafkaConfiguration {
                 ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
                 ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
                 ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
-                ProducerConfig.ACKS_CONFIG, "all"
+                ProducerConfig.ACKS_CONFIG, "all",
+                //Simulate Kafka Crash
+                ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, "3000",
+                ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, "1000",
+                ProducerConfig.MAX_BLOCK_MS_CONFIG, "1000"
         ));
     }
 

@@ -1,5 +1,0 @@
-io/mars/lite/api/chaos/ChaosControllerE2ETest.class
-io/mars/lite/api/order/OrderControllerE2ETest.class
-io/mars/lite/api/order/OrderServiceIntegrationTest.class
-io/mars/lite/AbstractIntegrationTest.class
-io/mars/lite/api/chaos/PhantomEventChaosAspectTest.class
