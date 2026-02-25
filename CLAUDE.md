@@ -13,7 +13,7 @@ Mars Enterprise Kit Lite is a free, open-source Order microservice with correct 
 This project is also an **AI-First** lab: all infrastructure operations are orchestrated by Claude Code.
 
 **What This Project IS:**
-- A single Order microservice with Onion Architecture (3-module Maven structure)
+- A single Order microservice with Onion Architecture (single-module, package-based layers)
 - Two use cases: Create Order (publishes to Kafka) and Cancel Order (consumes from Kafka)
 - Dual Write pattern (intentional — no atomic guarantee between DB and Kafka)
 - Educational template for learning Onion Architecture with a real, functional example
@@ -35,18 +35,14 @@ This project is also an **AI-First** lab: all infrastructure operations are orch
 # Start infrastructure (PostgreSQL + Redpanda)
 docker-compose up -d
 
-# Build all modules
+# Build the project
 mvn clean install
 
 # Run the application
-cd app && mvn spring-boot:run
+mvn spring-boot:run
 
 # Run tests
 mvn test                              # All tests
-mvn test -pl business                 # Unit tests (fast, no Spring)
-mvn test -pl data-provider            # Integration tests (TestContainers)
-mvn test -pl app                      # Service + E2E tests
-
 
 # Run single test class
 mvn test -Dtest=CreateOrderUseCaseTest
@@ -94,75 +90,65 @@ No authentication. Endpoints are open by design (educational project).
 
 ## Architecture
 
-### Onion Architecture (3 Modules)
+### Onion Architecture (Single Module, Package-Based Layers)
 
 ```
-business/           # Domain + Application Layer (pure Java, ZERO framework dependencies)
-  └── io.mars.lite.order/
-      ├── Order.java              # Aggregate Root
-      ├── OrderStatus.java        # Value Object (enum)
-      ├── OrderItem.java          # Value Object
-      ├── OrderCreatedEvent.java  # Domain Event (published after create)
-      ├── DomainResult.java       # Generic wrapper: record DomainResult<D, E>(D domain, E event)
-      ├── OrderRepository.java    # Port (interface)
-      ├── OrderEventPublisher.java # Port (interface) — decouples business from Kafka
-      ├── BusinessException.java  # Domain Exception
-      └── usecase/
-          ├── CreateOrderUseCase.java      # Interface
-          ├── CreateOrderUseCaseImpl.java   # Implementation (record)
-          ├── CancelOrderUseCase.java      # Interface
-          └── CancelOrderUseCaseImpl.java  # Implementation
-
-data-provider/      # Infrastructure Layer (implements business interfaces)
-  └── io.mars.lite/
-      ├── configuration/
-      │   └── DataSourceConfiguration.java
-      └── order/
-          ├── OrderEntity.java            # JPA Entity
-          ├── OrderItemEntity.java        # JPA Entity (items)
-          ├── OrderJpaRepository.java     # Spring Data JPA
-          └── OrderRepositoryImpl.java    # Adapter (implements OrderRepository)
-
-app/                # API Entry Point (wires everything together)
-  └── io.mars.lite/
-      ├── Application.java
-      ├── configuration/
-      │   ├── UseCaseConfiguration.java   # Bean wiring
-      │   └── KafkaConfiguration.java     # Kafka producer/consumer config
-      └── api/
-          ├── order/
-          │   ├── OrderController.java
-          │   ├── OrderService.java           # @Service — transactional orchestrator
-          │   ├── CreateOrderRequest.java     # Separate file, Java record
-          │   └── OrderResponse.java          # Separate file, Java record
-          ├── event/
-          │   ├── OrderCreatedPublisher.java  # Kafka Producer — implements OrderEventPublisher
-          │   └── OrderCancelledConsumer.java # Kafka Consumer
-          ├── chaos/                            # Chaos Testing (@Profile("chaos") only)
-          │   ├── ChaosController.java          # POST /chaos/phantom-event
-          │   ├── ChaosService.java             # @Transactional orchestrator
-          │   ├── ChaosOrderExecutor.java       # AOP target (wraps UseCase)
-          │   ├── PhantomEventChaosAspect.java  # @Aspect — forces rollback after publish
-          │   ├── PhantomEventSimulationException.java  # RuntimeException with orderId
-          │   └── PhantomEventReport.java       # Response DTO (record)
-          └── GlobalExceptionHandler.java
+src/main/java/io/mars/lite/
+├── Application.java                          # Spring Boot entry point
+│
+├── domain/                                   # Domain Layer — NO JPA, NO Kafka, NO Web
+│   ├── Order.java                            # Aggregate Root (record)
+│   ├── OrderStatus.java                      # Value Object (enum)
+│   ├── OrderItem.java                        # Value Object (record)
+│   ├── OrderCreatedEvent.java                # Domain Event (record)
+│   ├── DomainResult.java                     # Generic wrapper: record DomainResult<D, E>
+│   ├── OrderRepository.java                  # Port (interface)
+│   ├── OrderEventPublisher.java              # Port (interface) — decouples domain from Kafka
+│   ├── BusinessException.java                # Domain Exception
+│   └── usecase/
+│       ├── CreateOrderUseCase.java           # @Service class (was: sealed interface + record impl)
+│       └── CancelOrderUseCase.java           # @Service class (was: sealed interface + record impl)
+│
+├── infrastructure/                           # Infrastructure Layer — implements domain ports
+│   ├── persistence/
+│   │   ├── OrderEntity.java                  # JPA Entity
+│   │   ├── OrderItemEntity.java              # JPA Entity (items)
+│   │   ├── OrderJpaRepository.java           # Spring Data JPA
+│   │   └── OrderRepositoryImpl.java          # Adapter (implements OrderRepository)
+│   ├── messaging/
+│   │   ├── OrderCreatedPublisher.java        # Kafka Producer — implements OrderEventPublisher
+│   │   └── OrderCancelledConsumer.java       # Kafka Consumer
+│   └── configuration/
+│       ├── AuditingConfiguration.java        # @EnableJpaAuditing (was: DataSourceConfiguration)
+│       └── KafkaConfiguration.java           # Kafka producer config
+│
+└── api/                                      # API Layer — HTTP entry points
+    ├── OrderController.java                  # REST controller (POST /orders, GET /orders/{id})
+    ├── CreateOrderRequest.java               # Request DTO (record)
+    ├── OrderResponse.java                    # Response DTO (record)
+    ├── GlobalExceptionHandler.java           # @RestControllerAdvice
+    └── chaos/                                # Chaos Testing (@Profile("chaos") only)
+        ├── ChaosController.java              # POST /chaos/phantom-event
+        ├── ChaosService.java                 # @Transactional orchestrator
+        ├── ChaosOrderExecutor.java           # AOP target (wraps CreateOrderUseCase)
+        ├── PhantomEventChaosAspect.java      # @Aspect — forces rollback after publish
+        ├── PhantomEventSimulationException.java  # RuntimeException with orderId
+        └── PhantomEventReport.java           # Response DTO (record)
 ```
 
 ### Dependency Rule (The Onion Law)
 
-Dependencies always point **inward**:
-- **business/** → depends on NOTHING (pure Java)
-- **data-provider/** → depends on business (implements its interfaces)
-- **app/** → depends on business + data-provider (wires everything)
+Dependencies always point **inward** (enforced by ArchUnit `ArchitectureTest`):
+- **domain/** → depends on NOTHING (no JPA, no Kafka, no Web — only @Service and @Transactional allowed)
+- **infrastructure/** → depends on domain (implements its ports)
+- **api/** → depends on domain + infrastructure configuration (wires everything via DI)
 
 ### The Intentional Anti-Pattern: Dual Write
 
-`CreateOrderUseCaseImpl` calls two ports in sequence — `OrderRepository.save()` then `OrderEventPublisher.publish()` — with **no atomic guarantee** between them. If the Kafka publish fails after the DB commit, the event is silently lost. This is by design.
+`CreateOrderUseCase` calls two ports in sequence — `OrderRepository.save()` then `OrderEventPublisher.publish()` — with **no atomic guarantee** between them. If the Kafka publish fails after the DB commit, the event is silently lost. This is by design.
 
 ```
-POST /orders → OrderService (@Transactional)
-                    │
-             CreateOrderUseCase.execute()
+POST /orders → CreateOrderUseCase (@Transactional @Service)
                     │
          ┌──────────┴──────────┐
          ▼                     ▼
@@ -172,12 +158,18 @@ POST /orders → OrderService (@Transactional)
                     ⚠️  No atomicity guarantee
 ```
 
-`CreateOrderUseCaseImpl` is a **record** that holds both ports as components:
+`CreateOrderUseCase` is a **@Service class** with constructor injection:
 ```java
-record CreateOrderUseCaseImpl(
-    OrderRepository orderRepository,
-    OrderEventPublisher orderEventPublisher
-) implements CreateOrderUseCase { ... }
+@Service
+public class CreateOrderUseCase {
+    public CreateOrderUseCase(OrderRepository orderRepository,
+                               OrderEventPublisher orderEventPublisher) { ... }
+
+    @Transactional
+    public UUID execute(Input input) { ... }
+
+    public record Input(Set<OrderItem> items, UUID customerId) {}
+}
 ```
 
 The Transactional Outbox pattern solves this, but is intentionally omitted from Lite.
@@ -256,24 +248,40 @@ mars-enterprise-kit-lite/
 │   └── commands/
 │       ├── generate-prp.md                       # PRP generation command
 │       └── execute-prp.md                        # PRP execution command
-├── business/                                     # Domain module (pure Java)
-│   ├── pom.xml
-│   └── src/
-│       ├── main/java/io/mars/lite/order/
-│       └── test/java/io/mars/lite/order/
-├── data-provider/                                # Infrastructure module
-│   ├── pom.xml
-│   └── src/
-│       ├── main/java/io/mars/lite/
-│       └── main/resources/db/migration/
-├── app/                                          # API entry point (port: 8082)
-│   ├── pom.xml
-│   └── src/
-│       ├── main/java/io/mars/lite/
-│       └── main/resources/
-│           └── application.yaml
+├── src/
+│   ├── main/
+│   │   ├── java/io/mars/lite/
+│   │   │   ├── Application.java                  # Spring Boot entry point
+│   │   │   ├── domain/                           # Domain layer (no JPA/Kafka/Web)
+│   │   │   │   ├── Order.java, OrderItem.java, OrderStatus.java
+│   │   │   │   ├── OrderCreatedEvent.java, DomainResult.java
+│   │   │   │   ├── OrderRepository.java, OrderEventPublisher.java (ports)
+│   │   │   │   ├── BusinessException.java
+│   │   │   │   └── usecase/
+│   │   │   │       ├── CreateOrderUseCase.java   # @Service
+│   │   │   │       └── CancelOrderUseCase.java   # @Service
+│   │   │   ├── infrastructure/                   # Infrastructure layer
+│   │   │   │   ├── persistence/                  # JPA adapters
+│   │   │   │   ├── messaging/                    # Kafka producer/consumer
+│   │   │   │   └── configuration/                # AuditingConfiguration, KafkaConfiguration
+│   │   │   └── api/                              # HTTP layer
+│   │   │       ├── OrderController.java
+│   │   │       ├── CreateOrderRequest.java, OrderResponse.java
+│   │   │       ├── GlobalExceptionHandler.java
+│   │   │       └── chaos/                        # @Profile("chaos") only
+│   │   └── resources/
+│   │       ├── application.yaml
+│   │       └── db/migration/V1__create_orders_table.sql
+│   └── test/
+│       └── java/io/mars/lite/
+│           ├── ArchitectureTest.java             # ArchUnit rules (12 tests)
+│           ├── AbstractIntegrationTest.java      # Shared TestContainers setup
+│           ├── ApplicationContextTest.java       # Spring context smoke test
+│           ├── domain/                           # Unit tests (no Spring)
+│           ├── infrastructure/                   # Repository integration tests
+│           └── api/                              # E2E tests (REST Assured)
 ├── docker-compose.yml                            # PostgreSQL + Redpanda
-├── pom.xml                                       # Parent POM
+├── pom.xml                                       # Single POM (packaging=jar)
 ├── CLAUDE.md                                     # This file
 └── README.md
 ```
@@ -282,8 +290,12 @@ mars-enterprise-kit-lite/
 
 ### Package Structure
 - Base package: `io.mars.lite`
-- Domain: `io.mars.lite.order`
-- Use cases: `io.mars.lite.order.usecase`
+- Domain: `io.mars.lite.domain`
+- Use cases: `io.mars.lite.domain.usecase`
+- Infrastructure persistence: `io.mars.lite.infrastructure.persistence`
+- Infrastructure messaging: `io.mars.lite.infrastructure.messaging`
+- Infrastructure configuration: `io.mars.lite.infrastructure.configuration`
+- API: `io.mars.lite.api`
 
 ### Domain Objects
 - Use Java **records** for immutable domain objects and value objects
@@ -291,10 +303,10 @@ mars-enterprise-kit-lite/
 - Business logic lives in domain objects, not services
 
 ### Naming
-- Interfaces as ports: `OrderRepository`, `OrderEventPublisher` (in business/)
-- Implementations as adapters: `OrderRepositoryImpl`, `OrderCreatedPublisher` (in data-provider/ and app/)
-- Use cases: `CreateOrderUseCase` (interface), `CreateOrderUseCaseImpl` (implementation — a **record**)
-- Service layer: `OrderService` — `@Service` in app/, wraps use cases with `@Transactional`
+- Interfaces as ports: `OrderRepository`, `OrderEventPublisher` (in domain/)
+- Implementations as adapters: `OrderRepositoryImpl`, `OrderCreatedPublisher` (in infrastructure/)
+- Use cases: `CreateOrderUseCase` (concrete `@Service` class — NO separate interface)
+- No service wrapper: `OrderController` injects `CreateOrderUseCase` directly
 - Test naming: `should{ExpectedBehavior}When{Condition}`
 
 ### Code Style
@@ -351,23 +363,23 @@ All implementations MUST follow TDD. This is not optional.
 4. REPEAT
 ```
 
-### Testing Strategy by Module
+### Testing Strategy by Package
 
-| Module | Test Type | Speed | Framework | What to Test |
-|--------|-----------|-------|-----------|--------------|
-| **business/** | Unit tests | < 1ms | JUnit 5 + Mockito | Domain logic, use cases, value objects |
-| **data-provider/** | Integration tests | ~100ms | Spring Boot Test + TestContainers | JPA mappings, migrations, repository adapters |
-| **app/service/** | Service integration tests | ~200ms | Spring Boot Test + TestContainers | @Service classes with ACID transactions |
-| **app/api/** | E2E tests | ~500ms | REST Assured (BDD-style) | Full HTTP request/response cycle |
+| Package | Test Location | Test Type | Speed | Framework | What to Test |
+|---------|--------------|-----------|-------|-----------|--------------|
+| **domain/** | `src/test/java/.../domain/` | Unit tests | < 1ms | JUnit 5 + Mockito | Domain logic, use cases, value objects |
+| **infrastructure/persistence/** | `src/test/java/.../infrastructure/` | Integration tests | ~100ms | Spring Boot Test + TestContainers | JPA mappings, migrations, repository adapters |
+| **domain/usecase/** (integration) | `src/test/java/.../domain/usecase/` | Use case integration tests | ~200ms | Spring Boot Test + TestContainers | @Service use cases with ACID transactions |
+| **api/** | `src/test/java/.../api/` | E2E tests | ~500ms | REST Assured (BDD-style) | Full HTTP request/response cycle |
 
 **Implementation order (inside out):**
-1. Domain logic tests first (business/) — Unit tests
-2. Repository tests (data-provider/) — Integration tests with TestContainers
-3. Service layer tests (app/) — Verify ACID transactions
-4. Controller E2E tests (app/) — REST Assured `given().when().then()`
+1. Domain logic tests first (domain/) — Unit tests with mocks
+2. Repository tests (infrastructure/persistence/) — Integration tests with TestContainers
+3. Use case integration tests (domain/usecase/) — Verify ACID transactions
+4. Controller E2E tests (api/) — REST Assured `given().when().then()`
 
 **Rules:**
-- Every `@Service` class MUST have a corresponding integration test
+- Every `@Service` use case MUST have a corresponding integration test
 - Every `@RestController` MUST have E2E tests with REST Assured
 - Never write production code before a failing test
 
@@ -442,16 +454,16 @@ Response (`200 OK`):
 
 ### Adding a New Domain Aggregate
 
-1. **Write failing tests** in `business/src/test/`
-2. **Create domain class** in `business/src/main/java/io/mars/lite/order/` — records for value objects, enforce invariants
-3. **Create repository interface** (port) in `business/`
-4. **Write failing integration tests** in `data-provider/src/test/`
-5. **Create JPA entity** in `data-provider/` — maps domain to database
-6. **Implement repository** (adapter) in `data-provider/`
-7. **Create Flyway migration** in `data-provider/src/main/resources/db/migration/`
-8. **Write failing E2E tests** in `app/src/test/`
-9. **Create controller + DTOs** in `app/`
-10. **Wire dependencies** in `app/.../configuration/UseCaseConfiguration.java`
+1. **Write failing tests** in `src/test/java/io/mars/lite/domain/`
+2. **Create domain class** in `src/main/java/io/mars/lite/domain/` — records for value objects, enforce invariants
+3. **Create repository interface** (port) in `domain/`
+4. **Write failing integration tests** in `src/test/java/io/mars/lite/infrastructure/`
+5. **Create JPA entity** in `infrastructure/persistence/` — maps domain to database
+6. **Implement repository** (adapter) in `infrastructure/persistence/`
+7. **Create Flyway migration** in `src/main/resources/db/migration/`
+8. **Write failing E2E tests** in `src/test/java/io/mars/lite/api/`
+9. **Create controller + DTOs** in `api/`
+10. **No manual wiring needed** — `@Service` + component scanning auto-discovers all beans
 
 ### Adding a New Kafka Event
 
@@ -474,25 +486,28 @@ Response (`200 OK`):
 - Enforce null safety with `Objects.requireNonNull()`
 - Place business logic in domain objects, not services
 - Follow TDD strictly: test FIRST, then implement, then refactor
-- Follow Onion Architecture: business → data-provider → app
-- Use ports (interfaces) in business/, adapters (implementations) in data-provider/
+- Follow Onion Architecture: domain → infrastructure → api (enforced by ArchUnit)
+- Use ports (interfaces) in domain/, adapters (implementations) in infrastructure/
 - Create separate files for Request/Response DTOs
 - Create Flyway migrations for all schema changes
-- Create integration tests for every `@Service`
+- Create integration tests for every `@Service` use case
 - Create REST Assured E2E tests for every `@RestController`
 - Use Dual Write for Kafka events (this is the Lite version)
+- Use concrete `@Service` classes for use cases (no separate interfaces)
 
 **DON'T:**
-- Add Spring/JPA annotations in business/ module
-- Let business/ depend on data-provider/ or app/
+- Add JPA, Kafka, or Spring Web annotations in domain/ package
+- Let domain/ depend on infrastructure/ or api/
 - Use setters in domain objects
 - Write production code before a failing test
 - Implement Outbox pattern (out of scope for Lite)
 - Implement Event Sourcing or SAGA (out of scope for Lite)
 - Use Avro or Schema Registry (Lite uses JSON)
 - Define DTOs as inner classes in controllers
-- Create `@Service` without integration tests
+- Create `@Service` use cases without integration tests
 - Create `@RestController` without E2E tests
+- Create a service wrapper just to call a use case (OrderController injects use cases directly)
+- Create a UseCaseConfiguration.java (component scanning handles all wiring)
 
 ## Context Resources
 

@@ -20,27 +20,29 @@ The absence of the Outbox is intentional: it exposes the Dual Write consistency 
 
 ## High Level Architecture Overview
 
-The diagram below shows the internal structure of the microservice — three Maven modules implementing the Onion Architecture pattern.
+The diagram below shows the internal structure of the microservice — a single Maven module with package-based Onion Architecture layers, enforced by ArchUnit tests.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  mars-enterprise-kit-lite                                       │
+│  mars-enterprise-kit-lite  (single Maven module, port 8082)     │
 │                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐   │
-│  │  app/  (Entry Point — port 8082)                         │   │
-│  │  OrderController · OrderService · KafkaConfiguration     │   │
-│  │  OrderCreatedPublisher · OrderCancelledConsumer          │   │
+│  │  api/  (HTTP Layer)                                      │   │
+│  │  OrderController · CreateOrderRequest · OrderResponse    │   │
+│  │  GlobalExceptionHandler · chaos/ (@Profile("chaos"))     │   │
 │  └─────────────────────┬────────────────────────────────────┘   │
 │                        │ depends on                             │
 │  ┌─────────────────────▼────────────────────────────────────┐   │
-│  │  data-provider/  (Infrastructure)                        │   │
-│  │  OrderRepositoryImpl · OrderEntity · Flyway migrations   │   │
+│  │  infrastructure/  (Adapters)                             │   │
+│  │  persistence/ · messaging/ · configuration/              │   │
+│  │  OrderRepositoryImpl · OrderCreatedPublisher             │   │
+│  │  OrderCancelledConsumer · KafkaConfiguration             │   │
 │  └─────────────────────┬────────────────────────────────────┘   │
 │                        │ depends on                             │
 │  ┌─────────────────────▼────────────────────────────────────┐   │
-│  │  business/  (Domain — zero framework dependencies)       │   │
+│  │  domain/  (No JPA · No Kafka · No Spring Web)            │   │
 │  │  Order · OrderRepository · OrderEventPublisher           │   │
-│  │  CreateOrderUseCase · CancelOrderUseCase                 │   │
+│  │  CreateOrderUseCase (@Service) · CancelOrderUseCase      │   │
 │  └──────────────────────────────────────────────────────────┘   │
 │                                                                 │
 │  ┌──────────────┐   ┌─────────────────────────────────────┐     │
@@ -51,11 +53,11 @@ The diagram below shows the internal structure of the microservice — three Mav
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-| Module | Description |
-|--------|-------------|
-| **business/** | Domain and application layer. Pure Java — zero Spring/JPA dependencies. Contains the aggregate root `Order`, ports (interfaces), use cases, and domain events. The Onion Law is enforced here: this module depends on nothing. |
-| **data-provider/** | Infrastructure layer. Implements `OrderRepository` (JPA adapter) and manages Flyway migrations. Depends on `business/`. |
-| **app/** | API entry point. Wires all dependencies, exposes REST endpoints, configures Kafka producer/consumer, and defines the `@Transactional` service layer. Depends on `business/` and `data-provider/`. |
+| Package | Description |
+|---------|-------------|
+| **domain/** | Domain and application layer. NO JPA, NO Kafka, NO Spring Web. Contains `Order`, ports (interfaces `OrderRepository`, `OrderEventPublisher`), `@Service` use cases, and domain events. ArchUnit enforces that nothing here depends on infrastructure or api. |
+| **infrastructure/** | Infrastructure layer. Implements domain ports (JPA adapter, Kafka publisher/consumer). Manages Flyway migrations. Depends on domain/ only. |
+| **api/** | HTTP entry point. Exposes REST endpoints, maps DTOs to domain objects. `OrderController` injects `CreateOrderUseCase` + `OrderRepository` directly — no service wrapper. Depends on domain/ ports only. |
 
 ## Prerequisites
 
@@ -71,11 +73,11 @@ Local execution requirements:
 # 1. Start infrastructure (PostgreSQL + Redpanda)
 docker-compose up -d
 
-# 2. Build all modules
+# 2. Build the project
 mvn clean install
 
 # 3. Run the application (port 8082)
-cd app && mvn spring-boot:run
+mvn spring-boot:run
 ```
 
 The application starts at **http://localhost:8082**.
@@ -394,7 +396,7 @@ The Lite version doesn't just describe the Dual Write problem — it **proves** 
 
 ```bash
 # Start the app with the chaos profile
-cd app && SPRING_PROFILES_ACTIVE=chaos mvn spring-boot:run
+SPRING_PROFILES_ACTIVE=chaos mvn spring-boot:run
 
 # Trigger the phantom event
 curl -s -X POST http://localhost:8082/chaos/phantom-event \
@@ -559,12 +561,11 @@ mvn flyway:repair
 ## Running Tests
 
 ```bash
-mvn test                                          # All modules
-mvn test -pl business                             # Unit tests (fast, no Spring)
-mvn test -pl data-provider                        # Integration tests (TestContainers)
-mvn test -pl app                                  # Service + E2E tests (REST Assured)
+mvn test                                          # All tests (50 tests total)
+mvn test -Dtest=ArchitectureTest                  # Architecture rules (12 tests, fast)
 mvn test -Dtest=CreateOrderUseCaseTest            # Single test class
-mvn test -Dtest=CreateOrderUseCaseTest#shouldCreateOrderSuccessfully  # Single method
+mvn test -Dtest=CreateOrderUseCaseTest#shouldSaveOrderAndPublishEvent  # Single method
+mvn clean verify                                  # Full build + all tests
 ```
 
 > TestContainers requires Docker running locally.
@@ -589,18 +590,28 @@ mars-enterprise-kit-lite/
 │       ├── chaos-testing/                         # Skill: lost event chaos test (infra-based)
 │       ├── exploratory-testing/                   # Skill: end-to-end smoke test
 │       └── git-worktree-prp/                      # Skill: worktree lifecycle for PRPs
-├── business/                                     # Domain module (pure Java, no frameworks)
-├── data-provider/                                # Infrastructure module (JPA + Flyway)
-├── app/                                          # API entry point (port 8082)
-│   └── src/main/java/io/mars/lite/api/
-│       ├── order/                                # Order endpoints (POST /orders, GET /orders/{id})
-│       ├── event/                                # Kafka producer + consumer
-│       └── chaos/                                # Chaos testing (@Profile("chaos") only)
-│           ├── ChaosController.java              # POST /chaos/phantom-event
-│           ├── PhantomEventChaosAspect.java      # AOP @Around — forces rollback
-│           └── ...                               # Service, executor, DTOs
+├── src/
+│   ├── main/
+│   │   ├── java/io/mars/lite/
+│   │   │   ├── Application.java
+│   │   │   ├── domain/                           # Domain layer (no JPA/Kafka/Web)
+│   │   │   │   └── usecase/                      # @Service use cases
+│   │   │   ├── infrastructure/                   # Adapters (JPA, Kafka, config)
+│   │   │   │   ├── persistence/
+│   │   │   │   ├── messaging/
+│   │   │   │   └── configuration/
+│   │   │   └── api/                              # HTTP endpoints + chaos testing
+│   │   │       └── chaos/                        # @Profile("chaos") only
+│   │   └── resources/
+│   │       ├── application.yaml
+│   │       └── db/migration/V1__create_orders_table.sql
+│   └── test/
+│       └── java/io/mars/lite/
+│           ├── ArchitectureTest.java             # 12 ArchUnit rules
+│           ├── AbstractIntegrationTest.java
+│           ├── domain/ · infrastructure/ · api/  # Tests by layer
 ├── docker-compose.yml                            # PostgreSQL + Redpanda
-├── pom.xml                                       # Parent POM
+├── pom.xml                                       # Single POM (packaging=jar)
 ├── CLAUDE.md                                     # AI instruction file (copy → AGENTS.md for Cursor/Codex)
 └── README.md                                     # This file
 ```
