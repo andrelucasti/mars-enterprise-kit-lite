@@ -22,36 +22,7 @@ The absence of the Outbox is intentional: it exposes the Dual Write consistency 
 
 The diagram below shows the internal structure of the microservice — a single Maven module with package-based Onion Architecture layers, enforced by ArchUnit tests.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  mars-enterprise-kit-lite  (single Maven module, port 8082)     │
-│                                                                 │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  api/  (HTTP Layer)                                      │   │
-│  │  OrderController · CreateOrderRequest · OrderResponse    │   │
-│  │  GlobalExceptionHandler · chaos/ (@Profile("chaos"))     │   │
-│  └─────────────────────┬────────────────────────────────────┘   │
-│                        │ depends on                             │
-│  ┌─────────────────────▼────────────────────────────────────┐   │
-│  │  infrastructure/  (Adapters)                             │   │
-│  │  persistence/ · messaging/ · configuration/              │   │
-│  │  OrderRepositoryImpl · OrderCreatedPublisher             │   │
-│  │  OrderCancelledConsumer · KafkaConfiguration             │   │
-│  └─────────────────────┬────────────────────────────────────┘   │
-│                        │ depends on                             │
-│  ┌─────────────────────▼────────────────────────────────────┐   │
-│  │  domain/  (No JPA · No Kafka · No Spring Web)            │   │
-│  │  Order · OrderRepository · OrderEventPublisher           │   │
-│  │  CreateOrderUseCase (@Service) · CancelOrderUseCase      │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                 │
-│  ┌──────────────┐   ┌─────────────────────────────────────┐     │
-│  │  PostgreSQL  │   │  Redpanda (Kafka-compatible)        │     │
-│  │  16-alpine   │   │  Kafka: 9092 · Admin: 9644          │     │
-│  │  Port: 5432  │   │  Schema Registry: 8081              │     │
-│  └──────────────┘   └─────────────────────────────────────┘     │
-└─────────────────────────────────────────────────────────────────┘
-```
+![Architecture Overview](mars-enterprise-kit-lite.drawio.png)
 
 | Package | Description |
 |---------|-------------|
@@ -305,18 +276,17 @@ Events that the order-service **consumes**:
 sequenceDiagram
     participant Client as Client
     participant API as OrderController
-    participant SVC as "OrderService (@Transactional)"
-    participant UC as CreateOrderUseCase
+    participant UC as "CreateOrderUseCase (@Transactional)"
     participant DB as PostgreSQL
     participant K as "Kafka (order.created)"
 
     Client->>API: POST /orders { customerId, items }
-    API->>SVC: createOrder(request)
-    SVC->>UC: execute(CreateOrderCommand)
+    API->>UC: execute(input)
     UC->>DB: INSERT orders + order_items
     UC->>K: send("order.created")
-    Note over DB,K: Dual Write - no atomic guarantee between DB and Kafka
-    SVC-->>API: OrderCreatedEvent
+    Note over DB,K: ⚠️ Dual Write — if Kafka fails, catch swallows the exception
+    Note over DB,K: DB stays committed. HTTP 201 returned. Event silently lost.
+    UC-->>API: orderId
     API-->>Client: 201 Created { orderId }
 ```
 
@@ -368,21 +338,33 @@ Distributed systems that need to **persist data AND publish events** face a fund
 
 The naive — and most common — solution is **Dual Write**: save to the database, then publish to Kafka inside a `@Transactional`. Spring manages the DB rollback on failure, but **does not undo an already-published Kafka event**. The reverse is also true: if Kafka goes down after the DB commit, the event is silently lost.
 
+![Happy Path](dual-write-problem-happy-path.drawio.png)
+
+This project makes the failure mode explicit — here is the actual code running in `CreateOrderUseCase`:
+
+```java
+@Transactional
+public UUID execute(final Input input) {
+    var result = Order.create(input.customerId(), input.items());
+    orderRepository.save(result.domain());   // ← DB commit guaranteed
+
+    try {
+        orderEventPublisher.publish(result.event());  // ← Kafka, outside transaction
+    } catch (Exception e) {
+        // ⚠️ Exception swallowed. DB already committed.
+        // HTTP 201 will be returned. Event is silently lost.
+        log.warn("DUAL WRITE FAILURE — EVENT LOST for orderId={}", result.domain().id());
+    }
+
+    return result.domain().id();
+}
 ```
-POST /orders
-  │
-  @Transactional
-  ├── 1. INSERT INTO orders ✅ (saved)
-  └── 2. kafkaTemplate.send("order.created") → 💥 failure
-           │
-           Result: Order exists in DB.
-                   Event never reached the consumer.
-                   Silent inconsistency.
-```
+
+This pattern is extremely common in production codebases. It looks defensive — it is actually **hiding a data consistency failure**. The DB committed, the client received 201, and downstream consumers never got the event. No error. No alert. Silent inconsistency.
 
 **This is exactly the scenario this project reproduces — by design.**
 
-In production with high concurrency, this inconsistency window is enough to generate ghost orders — saved in the database, invisible to other services. The Transactional Outbox Pattern solves this. The Lite version exposes the problem so that you feel it.
+In production with high concurrency, this inconsistency window is enough to generate lost events at scale — orders saved in the database, invisible to downstream services. The Transactional Outbox Pattern solves this. The Lite version exposes the problem so that you feel it.
 
 ## Chaos Testing — Proving the Dual Write Problem
 
@@ -463,6 +445,8 @@ sequenceDiagram
     CC-->>Client: 200 OK { existsInDb: false, eventSentToKafka: true }
 ```
 
+![Failure Case 2 - Phantom Event](dual-write-problem-failure-case-2.drawio.png)
+
 > **How it works internally:** `PhantomEventChaosAspect` is an AOP `@Around` advice that intercepts `ChaosOrderExecutor.execute()`. It lets the use case run completely (DB INSERT + Kafka publish), then throws a `PhantomEventSimulationException`. Since the exception occurs inside the `@Transactional` boundary, Spring rolls back the DB — but `KafkaTemplate.send()` already dispatched the event. All chaos beans use `@Profile("chaos")` and don't exist in the default profile.
 
 ---
@@ -471,22 +455,26 @@ sequenceDiagram
 
 **The problem:** An order is persisted in PostgreSQL, but the corresponding Kafka event is **never published**. Downstream consumers never learn the order was created.
 
-**How to reproduce:** Stop Redpanda before creating an order. The DB commit succeeds, but the Kafka publish fails or hangs.
+**How to reproduce:** Stop Redpanda before creating an order. The `try-catch` in `CreateOrderUseCase` swallows the Kafka exception — the DB commit succeeds, and the client receives **HTTP 201** with no indication that the event was lost.
 
 ```bash
 # 1. Create a baseline order (everything healthy)
 curl -s -X POST http://localhost:8082/orders \
   -H "Content-Type: application/json" \
   -d '{"customerId":"550e8400-e29b-41d4-a716-446655440000","items":[{"productId":"6ba7b810-9dad-11d1-80b4-00c04fd430c8","quantity":1,"unitPrice":50.00}]}'
-# → 201 Created
+# → 201 Created — order in DB, event in Kafka ✅
 
 # 2. Kill Kafka
 docker-compose stop redpanda
 
-# 3. Try to create another order
+# 3. Create another order — Kafka is down
 curl -s -X POST http://localhost:8082/orders \
   -H "Content-Type: application/json" \
   -d '{"customerId":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee","items":[{"productId":"11111111-2222-3333-4444-555555555555","quantity":1,"unitPrice":99.99}]}'
+# → 201 Created — event silently lost ⚠️
+
+# Check the application log — only a WARN, not an error:
+# WARN DUAL WRITE FAILURE — EVENT LOST for orderId=<uuid>. Order saved in DB but event NOT published to Kafka.
 
 # 4. Bring Kafka back
 docker-compose start redpanda
@@ -497,19 +485,7 @@ docker-compose exec postgres psql -U mars -d orders_db -c "SELECT COUNT(*) FROM 
 docker-compose exec redpanda rpk topic consume order.created --format '%v\n' | wc -l
 ```
 
-```
-┌─────────────────────────────────────────────────────┐
-│  LOST EVENT                                          │
-│                                                      │
-│  ┌──────────┐          ┌──────────┐                  │
-│  │ PostgreSQL│          │  Kafka   │                  │
-│  │ 2 orders │          │ 1 event  │                  │
-│  └──────────┘          └──────────┘                  │
-│                                                      │
-│  Order #2 exists in DB but has NO corresponding      │
-│  event in Kafka. Consumers don't know it exists.     │
-└─────────────────────────────────────────────────────┘
-```
+![Failure Case 1 - Lost Event](dual-write-problem-failure-case-1.drawio.png)
 
 ---
 
@@ -519,7 +495,8 @@ Both scenarios are caused by the same root issue: **no atomicity between Postgre
 
 | | Scenario 1: Phantom Event | Scenario 2: Lost Event |
 |---|---|---|
-| **Trigger** | AOP forces DB rollback after publish | Kafka is down during order creation |
+| **Trigger** | AOP forces DB rollback after publish | Kafka is down, `catch` swallows exception |
+| **HTTP Response** | 500 (DB rolled back by AOP) | **201** — client sees success, event is gone |
 | **PostgreSQL** | Order does NOT exist (rolled back) | Order EXISTS (committed) |
 | **Kafka** | Event EXISTS (already sent) | Event does NOT exist (publish failed) |
 | **Impact** | Consumers process a non-existent order | Consumers never learn the order was created |
