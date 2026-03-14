@@ -63,7 +63,7 @@ Um repositório GitHub público contendo um único microserviço Java/Spring Boo
 **O que o Lite NÃO entrega (por design):**
 - Transactional Outbox Pattern (fora do escopo do Lite).
 - Helm charts / Kubernetes manifests.
-- CI/CD pipelines.
+- CI/CD pipelines (GitHub Actions workflow added: builds and pushes Docker image to GHCR on every push to `main`).
 - Autenticação / Autorização.
 - Schema Registry / Apache Avro.
 - Observabilidade completa (sem Jaeger, sem OpenTelemetry).
