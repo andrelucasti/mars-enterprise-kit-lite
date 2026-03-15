@@ -1,0 +1,7 @@
+apiVersion: v2
+name: mars-enterprise-kit-lite
+description: Order microservice with Onion Architecture and Dual Write pattern — educational Helm chart
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+# No subchart dependencies — PostgreSQL and Kafka are external services

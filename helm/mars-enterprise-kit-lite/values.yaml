@@ -1,0 +1,135 @@
+# =============================================================================
+# Application
+# =============================================================================
+replicaCount: 1
+
+image:
+  repository: ghcr.io/andrelucasti/mars-enterprise-kit-lite
+  tag: "latest" # Defaults to Chart.appVersion
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+# =============================================================================
+# Service
+# =============================================================================
+service:
+  type: ClusterIP
+  port: 8082
+  targetPort: 8082
+
+# =============================================================================
+# Spring Boot Configuration
+# =============================================================================
+spring:
+  profiles:
+    active: "default"
+  datasource:
+    password: "mars" # Override for dev. Use existingSecret in prod.
+
+# External Secret reference (pre-created K8s Secret with DB password)
+# Set this to use a pre-existing secret instead of the chart-managed one
+existingSecret: ""
+existingSecretKey: "SPRING_DATASOURCE_PASSWORD"
+
+# =============================================================================
+# External Database (PostgreSQL) — NOT managed by this chart
+# =============================================================================
+# Provide connection details for your external PostgreSQL instance.
+# Examples: AWS RDS, Cloud SQL, self-hosted PostgreSQL, etc.
+externalDatabase:
+  host: "local" # PostgreSQL hostname or IP
+  port: 5432 # PostgreSQL port
+  database: "local" # Database name
+  username: "mars" # Database username
+
+# =============================================================================
+# External Kafka — NOT managed by this chart
+# =============================================================================
+# Provide the bootstrap servers for your external Kafka/Redpanda cluster.
+# Examples: Confluent Cloud, Amazon MSK, self-hosted Kafka, Redpanda, etc.
+externalKafka:
+  bootstrapServers: "localhost:9092" # Comma-separated list of broker addresses
+
+# =============================================================================
+# ServiceAccount
+# =============================================================================
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# =============================================================================
+# Health Probes
+# =============================================================================
+probes:
+  liveness:
+    path: /actuator/health/liveness
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    failureThreshold: 3
+  readiness:
+    path: /actuator/health/readiness
+    initialDelaySeconds: 20
+    periodSeconds: 5
+    failureThreshold: 3
+  startup:
+    path: /actuator/health/liveness
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    failureThreshold: 30
+
+# =============================================================================
+# Resources
+# =============================================================================
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# =============================================================================
+# Monitoring — Prometheus ServiceMonitor
+# =============================================================================
+serviceMonitor:
+  enabled: false # Set to true if Prometheus Operator is installed
+  interval: 30s
+  scrapeTimeout: 10s
+  path: /actuator/prometheus
+  labels: {} # e.g., release: kube-prometheus-stack
+
+# =============================================================================
+# OpenTelemetry — Auto-instrumentation
+# =============================================================================
+# Requires the OpenTelemetry Operator installed in the cluster.
+# The annotation tells the operator to inject the Java agent automatically.
+opentelemetry:
+  enabled: false
+  injectJava: "true" # Value for instrumentation.opentelemetry.io/inject-java annotation
+  exporter:
+    endpoint: http://signoz-otel-collector.signoz.svc.cluster.local:4318
+  propagators:
+    - tracecontext
+    - baggage
+  sampler:
+    type: parentbased_traceidratio
+    argument: "1"
+  java:
+    image: ghcr.io/open-telemetry/opentelemetry-operator/autoinstrumentation-java:latest
+
+# =============================================================================
+# Ingress
+# =============================================================================
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: mars-orders.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []

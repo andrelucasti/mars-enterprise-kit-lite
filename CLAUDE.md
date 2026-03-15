@@ -24,7 +24,6 @@ This project is also an **AI-First** lab: all infrastructure operations are orch
 - No Event Sourcing, no SAGA, no CQRS
 - No authentication, no observability beyond actuator
 - No Schema Registry, no Avro (JSON events only)
-- No Helm charts, no Kubernetes
 - CI/CD: GitHub Actions workflow builds and pushes Docker image to GHCR on every push to `main`
 
 
@@ -58,6 +57,7 @@ mvn clean verify
 ### Service Access
 - **API**: http://localhost:8082
 - **Health**: http://localhost:8082/actuator/health
+- **Prometheus Metrics**: http://localhost:8082/actuator/prometheus
 - **PostgreSQL**: localhost:5432 (orders_db)
 - **Redpanda (Kafka)**: localhost:9092
 - **Redpanda Admin**: localhost:9644
@@ -87,6 +87,8 @@ No authentication. Endpoints are open by design (educational project).
 | Messaging | Redpanda (Kafka-compatible) |
 | Event Format | JSON (Jackson) |
 | Containers | Docker Compose |
+| Kubernetes | Helm chart (external PostgreSQL + Kafka) |
+| Observability | Micrometer + Prometheus (ServiceMonitor) |
 | Testing | JUnit 5, TestContainers, REST Assured |
 
 ## Architecture
@@ -281,6 +283,23 @@ mars-enterprise-kit-lite/
 │           ├── domain/                           # Unit tests (no Spring)
 │           ├── infrastructure/                   # Repository integration tests
 │           └── api/                              # E2E tests (REST Assured)
+├── helm/
+│   └── mars-enterprise-kit-lite/                 # Helm chart (K8s deployment)
+│       ├── Chart.yaml                            # Chart metadata (no subchart deps)
+│       ├── values.yaml                           # Default configuration
+│       ├── .helmignore
+│       └── templates/                            # K8s manifests
+│           ├── _helpers.tpl                      # Template helpers
+│           ├── deployment.yaml                   # App Deployment with health probes
+│           ├── service.yaml                      # ClusterIP Service
+│           ├── configmap.yaml                    # Spring Boot config (non-sensitive)
+│           ├── secret.yaml                       # DB credentials (conditional)
+│           ├── servicemonitor.yaml               # Prometheus ServiceMonitor (conditional)
+│           ├── serviceaccount.yaml               # ServiceAccount (conditional)
+│           ├── ingress.yaml                      # Ingress (conditional)
+│           ├── NOTES.txt                         # Post-install instructions
+│           └── tests/test-connection.yaml        # Helm test
+├── docker-compose.yml                            # PostgreSQL + Redpanda
 ├── .github/
 │   └── workflows/
 │       └── push-to-main.yaml                     # CI: test → build & push Docker image to GHCR
@@ -514,6 +533,24 @@ Response (`200 OK`):
 - Create `@RestController` without E2E tests
 - Create a service wrapper just to call a use case (OrderController injects use cases directly)
 - Create a UseCaseConfiguration.java (component scanning handles all wiring)
+
+## Helm Chart (Kubernetes Deployment)
+
+The project includes a Helm chart at `helm/mars-enterprise-kit-lite/` for deploying to Kubernetes.
+
+### Key Design Decisions
+- **External infrastructure**: PostgreSQL and Kafka are NOT managed by the chart (no subcharts). Connection details are provided via `values.yaml` (`externalDatabase.*`, `externalKafka.*`).
+- **Port 8082**: The app runs on 8082, not 8080. All K8s manifests use `containerPort: 8082`.
+- **Prometheus metrics**: `micrometer-registry-prometheus` + ServiceMonitor (conditional, requires Prometheus Operator).
+- **Secrets**: DB password via K8s Secret. Supports `existingSecret` for pre-created secrets.
+
+### Helm Commands
+```bash
+helm lint helm/mars-enterprise-kit-lite/
+helm template mars helm/mars-enterprise-kit-lite/
+helm template mars helm/mars-enterprise-kit-lite/ --set serviceMonitor.enabled=true
+helm install mars helm/mars-enterprise-kit-lite/ --namespace mars --create-namespace
+```
 
 ## Context Resources
 

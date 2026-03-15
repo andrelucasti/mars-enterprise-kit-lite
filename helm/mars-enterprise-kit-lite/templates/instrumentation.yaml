@@ -1,0 +1,19 @@
+{{- if .Values.opentelemetry.enabled }}
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: {{ include "mars.fullname" . }}-instrumentation
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mars.labels" . | nindent 4 }}
+spec:
+  exporter:
+    endpoint: {{ .Values.opentelemetry.exporter.endpoint }}
+  propagators:
+    {{- toYaml .Values.opentelemetry.propagators | nindent 4 }}
+  sampler:
+    type: {{ .Values.opentelemetry.sampler.type }}
+    argument: {{ .Values.opentelemetry.sampler.argument | quote }}
+  java:
+    image: {{ .Values.opentelemetry.java.image }}
+{{- end }}

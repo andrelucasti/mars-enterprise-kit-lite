@@ -241,6 +241,8 @@ public OrderCreatedEvent execute(CreateOrderCommand command) {
 | Mensageria (local) | Redpanda | latest | Kafka-compatible, single binary, zero config |
 | Serialização de eventos | JSON (Jackson) | - | Simples para o escopo do Lite |
 | Containerização | Docker Compose | 2.23+ | Único arquivo para subir toda a infra local |
+| Kubernetes | Helm chart | 3.x | Deploy para K8s com external PostgreSQL/Kafka |
+| Observabilidade | Micrometer + Prometheus | - | Métricas via `/actuator/prometheus` + ServiceMonitor |
 
 ### 5.4 Modelo de Dados
 
@@ -462,6 +464,12 @@ mars-enterprise-kit-lite/
 │       └── main/resources/
 │           ├── application.yaml
 │           └── application-local.yaml
+│
+├── helm/                            # Helm chart para Kubernetes
+│   └── mars-enterprise-kit-lite/
+│       ├── Chart.yaml               # Metadata do chart (sem subchart deps)
+│       ├── values.yaml              # Configuração padrão
+│       └── templates/               # Manifests K8s (Deployment, Service, ConfigMap, etc.)
 │
 ├── docker-compose.yml               # PostgreSQL + Redpanda + order-service
 ├── .env.example                     # Variáveis de ambiente necessárias

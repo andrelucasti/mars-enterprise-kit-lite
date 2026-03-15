@@ -1,0 +1,28 @@
+Mars Enterprise Kit Lite has been deployed!
+
+Application URL:
+{{- if .Values.ingress.enabled }}
+  {{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+  {{- end }}
+{{- else }}
+  kubectl port-forward svc/{{ include "mars.fullname" . }} 8082:{{ .Values.service.port }} --namespace {{ .Release.Namespace }}
+  Then visit: http://localhost:8082
+{{- end }}
+
+API Endpoints:
+  POST /orders          — Create a new order
+  GET  /orders/{id}     — Get order by ID
+  GET  /actuator/health — Health check
+
+{{- if .Values.serviceMonitor.enabled }}
+Prometheus Metrics:
+  GET /actuator/prometheus — scraped by ServiceMonitor every {{ .Values.serviceMonitor.interval }}
+{{- end }}
+
+Prerequisites:
+  - External PostgreSQL must be reachable at: {{ .Values.externalDatabase.host }}:{{ .Values.externalDatabase.port }}
+  - External Kafka must be reachable at: {{ .Values.externalKafka.bootstrapServers }}
+
+NOTE: This is an educational project demonstrating the Dual Write anti-pattern.
+      The order service writes to PostgreSQL and publishes to Kafka WITHOUT atomic guarantees.
