@@ -39,10 +39,10 @@ existingSecretKey: "SPRING_DATASOURCE_PASSWORD"
 # Provide connection details for your external PostgreSQL instance.
 # Examples: AWS RDS, Cloud SQL, self-hosted PostgreSQL, etc.
 externalDatabase:
-  host: "pg-server.tailf345b0.ts.net" # PostgreSQL hostname or IP
+  host: "local" # PostgreSQL hostname or IP
   port: 5432 # PostgreSQL port
-  database: "mars_lite_order" # Database name
-  username: "andre" # Database username
+  database: "local" # Database name
+  username: "mars" # Database username
 
 # =============================================================================
 # External Kafka — NOT managed by this chart
