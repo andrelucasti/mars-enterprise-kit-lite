@@ -24,7 +24,7 @@ This project is also an **AI-First** lab: all infrastructure operations are orch
 - No Event Sourcing, no SAGA, no CQRS
 - No authentication, no observability beyond actuator
 - No Schema Registry, no Avro (JSON events only)
-- No CI/CD pipelines
+- CI/CD: GitHub Actions workflow builds and pushes Docker image to GHCR on every push to `main`
 
 
 ## Quick Reference
@@ -300,6 +300,12 @@ mars-enterprise-kit-lite/
 │           ├── NOTES.txt                         # Post-install instructions
 │           └── tests/test-connection.yaml        # Helm test
 ├── docker-compose.yml                            # PostgreSQL + Redpanda
+├── .github/
+│   └── workflows/
+│       └── push-to-main.yaml                     # CI: test → build & push Docker image to GHCR
+├── Dockerfile                                    # Multi-stage build (Maven build → JRE runtime)
+├── .dockerignore                                 # Excludes .git, target, docs from Docker context
+├── docker-compose.yml                            # PostgreSQL + Redpanda (local dev)
 ├── pom.xml                                       # Single POM (packaging=jar)
 ├── CLAUDE.md                                     # This file
 └── README.md

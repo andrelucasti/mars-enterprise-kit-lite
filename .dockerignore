@@ -1,0 +1,10 @@
+.git
+.github
+.claude
+.mars
+.devcontainer
+.vscode
+.DS_Store
+target
+*.md
+docker-compose.yml
