@@ -1,0 +1,73 @@
+# signoz-values.yaml
+# Helm values para SigNoz no homelab (cluster: andrelab, single-node, local-path storage)
+# Aplicar com: helm upgrade --install signoz signoz/signoz -n signoz -f signoz-values.yaml
+
+global:
+  storageClass: local-path
+  clusterName: andrelab
+  deploymentEnvironment: homelab
+
+clickhouse:
+  installCustomStorageClass: true
+  resources:
+    requests:
+      memory: 1Gi
+      cpu: 200m
+    limits:
+      memory: 2Gi
+      cpu: 500m
+  persistence:
+    size: 20Gi
+  # Retenção de dados — adequada para homelab
+  coldStorage:
+    enabled: false
+  defaultReplication: 1
+
+queryService:
+  resources:
+    requests:
+      memory: 300Mi
+      cpu: 100m
+    limits:
+      memory: 1Gi
+      cpu: 500m
+  env:
+    - name: TELEMETRY_ENABLED
+      value: "false"
+
+frontend:
+  resources:
+    requests:
+      memory: 50Mi
+      cpu: 50m
+    limits:
+      memory: 200Mi
+      cpu: 200m
+
+otelCollector:
+  resources:
+    requests:
+      memory: 100Mi
+      cpu: 100m
+    limits:
+      memory: 500Mi
+      cpu: 500m
+
+otelCollectorMetrics:
+  resources:
+    requests:
+      memory: 50Mi
+      cpu: 50m
+    limits:
+      memory: 200Mi
+      cpu: 200m
+
+alertmanager:
+  enabled: true
+  resources:
+    requests:
+      memory: 50Mi
+      cpu: 25m
+    limits:
+      memory: 200Mi
+      cpu: 100m

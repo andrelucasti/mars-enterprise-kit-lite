@@ -1,0 +1,483 @@
+{
+  "title": "Kong Gateway",
+  "description": "Kong Gateway metrics via Prometheus plugin (port 8100). Job: kong-gateway. Cluster: andrelab.",
+  "tags": ["kong", "gateway", "infrastructure", "andrelab"],
+  "version": "v3",
+  "uploadedGrafana": false,
+  "variables": {},
+  "panelMap": {},
+  "layout": [
+    { "i": "stat-rps",        "x": 0,  "y": 0,  "w": 6,  "h": 3 },
+    { "i": "stat-error-rate", "x": 6,  "y": 0,  "w": 6,  "h": 3 },
+    { "i": "stat-p99",        "x": 12, "y": 0,  "w": 6,  "h": 3 },
+    { "i": "stat-conns",      "x": 18, "y": 0,  "w": 6,  "h": 3 },
+    { "i": "rps-service",     "x": 0,  "y": 3,  "w": 12, "h": 6 },
+    { "i": "rps-status",      "x": 12, "y": 3,  "w": 12, "h": 6 },
+    { "i": "lat-p99",         "x": 0,  "y": 9,  "w": 12, "h": 6 },
+    { "i": "lat-upstream",    "x": 12, "y": 9,  "w": 12, "h": 6 },
+    { "i": "lat-kong",        "x": 0,  "y": 15, "w": 12, "h": 6 },
+    { "i": "bandwidth",       "x": 12, "y": 15, "w": 12, "h": 6 },
+    { "i": "nginx-conns",     "x": 0,  "y": 21, "w": 12, "h": 6 },
+    { "i": "upstream-health", "x": 12, "y": 21, "w": 12, "h": 6 },
+    { "i": "consumers",       "x": 0,  "y": 27, "w": 12, "h": 6 },
+    { "i": "lua-memory",      "x": 12, "y": 27, "w": 12, "h": 6 }
+  ],
+  "widgets": [
+    {
+      "id": "stat-rps",
+      "title": "Total Request Rate",
+      "description": "All HTTP requests per second across all services",
+      "panelTypes": "value",
+      "query": {
+        "queryType": "promql",
+        "promql": [
+          {
+            "name": "A",
+            "query": "sum(rate(kong_http_requests_total{job=\"kong-gateway\"}[5m]))",
+            "legend": "req/s",
+            "disabled": false
+          }
+        ]
+      },
+      "yAxisUnit": "reqps",
+      "nullZeroValues": "zero",
+      "timePreference": "GLOBAL_TIME",
+      "thresholds": [],
+      "softMin": null,
+      "softMax": null
+    },
+    {
+      "id": "stat-error-rate",
+      "title": "5xx Error Rate",
+      "description": "HTTP 5xx responses per second",
+      "panelTypes": "value",
+      "query": {
+        "queryType": "promql",
+        "promql": [
+          {
+            "name": "A",
+            "query": "sum(rate(kong_http_requests_total{job=\"kong-gateway\",status_code=~\"5..\"}[5m]))",
+            "legend": "5xx/s",
+            "disabled": false
+          }
+        ]
+      },
+      "yAxisUnit": "reqps",
+      "nullZeroValues": "zero",
+      "timePreference": "GLOBAL_TIME",
+      "thresholds": [
+        { "value": 1,  "color": "yellow" },
+        { "value": 10, "color": "red" }
+      ],
+      "softMin": null,
+      "softMax": null
+    },
+    {
+      "id": "stat-p99",
+      "title": "Request Latency P99",
+      "description": "99th percentile end-to-end request latency",
+      "panelTypes": "value",
+      "query": {
+        "queryType": "promql",
+        "promql": [
+          {
+            "name": "A",
+            "query": "histogram_quantile(0.99, sum(rate(kong_latency_ms_bucket{job=\"kong-gateway\",type=\"request\"}[5m])) by (le))",
+            "legend": "P99 ms",
+            "disabled": false
+          }
+        ]
+      },
+      "yAxisUnit": "ms",
+      "nullZeroValues": "zero",
+      "timePreference": "GLOBAL_TIME",
+      "thresholds": [
+        { "value": 500,  "color": "yellow" },
+        { "value": 1000, "color": "red" }
+      ],
+      "softMin": null,
+      "softMax": null
+    },
+    {
+      "id": "stat-conns",
+      "title": "Active Connections",
+      "description": "Current active nginx connections",
+      "panelTypes": "value",
+      "query": {
+        "queryType": "promql",
+        "promql": [
+          {
+            "name": "A",
+            "query": "sum(kong_nginx_connections_total{job=\"kong-gateway\",state=\"active\"})",
+            "legend": "active",
+            "disabled": false
+          }
+        ]
+      },
+      "yAxisUnit": "short",
+      "nullZeroValues": "zero",
+      "timePreference": "GLOBAL_TIME",
+      "thresholds": [],
+      "softMin": null,
+      "softMax": null
+    },
+    {
+      "id": "rps-service",
+      "title": "Request Rate by Service",
+      "description": "HTTP requests per second broken down by Kong service",
+      "panelTypes": "graph",
+      "isStacked": false,
+      "opacity": "1",
+      "query": {
+        "queryType": "promql",
+        "promql": [
+          {
+            "name": "A",
+            "query": "sum(rate(kong_http_requests_total{job=\"kong-gateway\"}[5m])) by (service)",
+            "legend": "{{service}}",
+            "disabled": false
+          }
+        ]
+      },
+      "yAxisUnit": "reqps",
+      "nullZeroValues": "zero",
+      "fillSpans": false,
+      "timePreference": "GLOBAL_TIME",
+      "thresholds": [],
+      "softMin": 0,
+      "softMax": null
+    },
+    {
+      "id": "rps-status",
+      "title": "Request Rate by HTTP Status Code",
+      "description": "HTTP requests per second grouped by status code",
+      "panelTypes": "graph",
+      "isStacked": true,
+      "opacity": "0.4",
+      "query": {
+        "queryType": "promql",
+        "promql": [
+          {
+            "name": "A",
+            "query": "sum(rate(kong_http_requests_total{job=\"kong-gateway\",status_code=~\"2..\"}[5m]))",
+            "legend": "2xx",
+            "disabled": false
+          },
+          {
+            "name": "B",
+            "query": "sum(rate(kong_http_requests_total{job=\"kong-gateway\",status_code=~\"3..\"}[5m]))",
+            "legend": "3xx",
+            "disabled": false
+          },
+          {
+            "name": "C",
+            "query": "sum(rate(kong_http_requests_total{job=\"kong-gateway\",status_code=~\"4..\"}[5m]))",
+            "legend": "4xx",
+            "disabled": false
+          },
+          {
+            "name": "D",
+            "query": "sum(rate(kong_http_requests_total{job=\"kong-gateway\",status_code=~\"5..\"}[5m]))",
+            "legend": "5xx",
+            "disabled": false
+          }
+        ]
+      },
+      "yAxisUnit": "reqps",
+      "nullZeroValues": "zero",
+      "fillSpans": false,
+      "timePreference": "GLOBAL_TIME",
+      "thresholds": [],
+      "softMin": 0,
+      "softMax": null
+    },
+    {
+      "id": "lat-p99",
+      "title": "End-to-End Request Latency (P50 / P95 / P99)",
+      "description": "Total request latency percentiles per service (Kong + upstream + network)",
+      "panelTypes": "graph",
+      "isStacked": false,
+      "opacity": "1",
+      "query": {
+        "queryType": "promql",
+        "promql": [
+          {
+            "name": "A",
+            "query": "histogram_quantile(0.50, sum(rate(kong_latency_ms_bucket{job=\"kong-gateway\",type=\"request\"}[5m])) by (le, service))",
+            "legend": "P50 {{service}}",
+            "disabled": false
+          },
+          {
+            "name": "B",
+            "query": "histogram_quantile(0.95, sum(rate(kong_latency_ms_bucket{job=\"kong-gateway\",type=\"request\"}[5m])) by (le, service))",
+            "legend": "P95 {{service}}",
+            "disabled": false
+          },
+          {
+            "name": "C",
+            "query": "histogram_quantile(0.99, sum(rate(kong_latency_ms_bucket{job=\"kong-gateway\",type=\"request\"}[5m])) by (le, service))",
+            "legend": "P99 {{service}}",
+            "disabled": false
+          }
+        ]
+      },
+      "yAxisUnit": "ms",
+      "nullZeroValues": "zero",
+      "fillSpans": false,
+      "timePreference": "GLOBAL_TIME",
+      "thresholds": [],
+      "softMin": 0,
+      "softMax": null
+    },
+    {
+      "id": "lat-upstream",
+      "title": "Upstream Latency (P50 / P95 / P99)",
+      "description": "Time spent waiting for upstream service response, per service",
+      "panelTypes": "graph",
+      "isStacked": false,
+      "opacity": "1",
+      "query": {
+        "queryType": "promql",
+        "promql": [
+          {
+            "name": "A",
+            "query": "histogram_quantile(0.50, sum(rate(kong_latency_ms_bucket{job=\"kong-gateway\",type=\"upstream\"}[5m])) by (le, service))",
+            "legend": "P50 {{service}}",
+            "disabled": false
+          },
+          {
+            "name": "B",
+            "query": "histogram_quantile(0.95, sum(rate(kong_latency_ms_bucket{job=\"kong-gateway\",type=\"upstream\"}[5m])) by (le, service))",
+            "legend": "P95 {{service}}",
+            "disabled": false
+          },
+          {
+            "name": "C",
+            "query": "histogram_quantile(0.99, sum(rate(kong_latency_ms_bucket{job=\"kong-gateway\",type=\"upstream\"}[5m])) by (le, service))",
+            "legend": "P99 {{service}}",
+            "disabled": false
+          }
+        ]
+      },
+      "yAxisUnit": "ms",
+      "nullZeroValues": "zero",
+      "fillSpans": false,
+      "timePreference": "GLOBAL_TIME",
+      "thresholds": [],
+      "softMin": 0,
+      "softMax": null
+    },
+    {
+      "id": "lat-kong",
+      "title": "Kong Processing Latency (P50 / P95 / P99)",
+      "description": "Time spent inside Kong (plugins, routing) before forwarding to upstream",
+      "panelTypes": "graph",
+      "isStacked": false,
+      "opacity": "1",
+      "query": {
+        "queryType": "promql",
+        "promql": [
+          {
+            "name": "A",
+            "query": "histogram_quantile(0.50, sum(rate(kong_latency_ms_bucket{job=\"kong-gateway\",type=\"kong\"}[5m])) by (le, service))",
+            "legend": "P50 {{service}}",
+            "disabled": false
+          },
+          {
+            "name": "B",
+            "query": "histogram_quantile(0.95, sum(rate(kong_latency_ms_bucket{job=\"kong-gateway\",type=\"kong\"}[5m])) by (le, service))",
+            "legend": "P95 {{service}}",
+            "disabled": false
+          },
+          {
+            "name": "C",
+            "query": "histogram_quantile(0.99, sum(rate(kong_latency_ms_bucket{job=\"kong-gateway\",type=\"kong\"}[5m])) by (le, service))",
+            "legend": "P99 {{service}}",
+            "disabled": false
+          }
+        ]
+      },
+      "yAxisUnit": "ms",
+      "nullZeroValues": "zero",
+      "fillSpans": false,
+      "timePreference": "GLOBAL_TIME",
+      "thresholds": [],
+      "softMin": 0,
+      "softMax": null
+    },
+    {
+      "id": "bandwidth",
+      "title": "Bandwidth (Ingress / Egress)",
+      "description": "Network bytes per second through Kong proxy, by direction and service",
+      "panelTypes": "graph",
+      "isStacked": false,
+      "opacity": "1",
+      "query": {
+        "queryType": "promql",
+        "promql": [
+          {
+            "name": "A",
+            "query": "sum(rate(kong_bandwidth_bytes{job=\"kong-gateway\",type=\"ingress\"}[5m])) by (service)",
+            "legend": "ingress {{service}}",
+            "disabled": false
+          },
+          {
+            "name": "B",
+            "query": "sum(rate(kong_bandwidth_bytes{job=\"kong-gateway\",type=\"egress\"}[5m])) by (service)",
+            "legend": "egress {{service}}",
+            "disabled": false
+          }
+        ]
+      },
+      "yAxisUnit": "bytes",
+      "nullZeroValues": "zero",
+      "fillSpans": false,
+      "timePreference": "GLOBAL_TIME",
+      "thresholds": [],
+      "softMin": 0,
+      "softMax": null
+    },
+    {
+      "id": "nginx-conns",
+      "title": "Nginx Connections by State",
+      "description": "Nginx worker connection states: active, waiting (keep-alive), reading, writing",
+      "panelTypes": "graph",
+      "isStacked": true,
+      "opacity": "0.5",
+      "query": {
+        "queryType": "promql",
+        "promql": [
+          {
+            "name": "A",
+            "query": "kong_nginx_connections_total{job=\"kong-gateway\",state=\"active\"}",
+            "legend": "active",
+            "disabled": false
+          },
+          {
+            "name": "B",
+            "query": "kong_nginx_connections_total{job=\"kong-gateway\",state=\"waiting\"}",
+            "legend": "waiting",
+            "disabled": false
+          },
+          {
+            "name": "C",
+            "query": "kong_nginx_connections_total{job=\"kong-gateway\",state=\"reading\"}",
+            "legend": "reading",
+            "disabled": false
+          },
+          {
+            "name": "D",
+            "query": "kong_nginx_connections_total{job=\"kong-gateway\",state=\"writing\"}",
+            "legend": "writing",
+            "disabled": false
+          }
+        ]
+      },
+      "yAxisUnit": "short",
+      "nullZeroValues": "zero",
+      "fillSpans": false,
+      "timePreference": "GLOBAL_TIME",
+      "thresholds": [],
+      "softMin": 0,
+      "softMax": null
+    },
+    {
+      "id": "upstream-health",
+      "title": "Upstream Target Health",
+      "description": "Health status of upstream targets (1=healthy, 0=unhealthy). Requires active health checks enabled on upstreams.",
+      "panelTypes": "graph",
+      "isStacked": false,
+      "opacity": "1",
+      "query": {
+        "queryType": "promql",
+        "promql": [
+          {
+            "name": "A",
+            "query": "kong_upstream_target_health{job=\"kong-gateway\",state=\"healthy\"}",
+            "legend": "healthy — {{upstream}} / {{target}}",
+            "disabled": false
+          },
+          {
+            "name": "B",
+            "query": "kong_upstream_target_health{job=\"kong-gateway\",state=\"unhealthy\"}",
+            "legend": "unhealthy — {{upstream}} / {{target}}",
+            "disabled": false
+          },
+          {
+            "name": "C",
+            "query": "kong_upstream_target_health{job=\"kong-gateway\",state=\"dns_error\"}",
+            "legend": "dns_error — {{upstream}} / {{target}}",
+            "disabled": false
+          }
+        ]
+      },
+      "yAxisUnit": "short",
+      "nullZeroValues": "zero",
+      "fillSpans": false,
+      "timePreference": "GLOBAL_TIME",
+      "thresholds": [
+        { "value": 0.5, "color": "red" }
+      ],
+      "softMin": 0,
+      "softMax": 1
+    },
+    {
+      "id": "consumers",
+      "title": "Request Rate by Consumer",
+      "description": "Requests per second broken down by authenticated consumer (requires per_consumer: true in Prometheus plugin)",
+      "panelTypes": "graph",
+      "isStacked": false,
+      "opacity": "1",
+      "query": {
+        "queryType": "promql",
+        "promql": [
+          {
+            "name": "A",
+            "query": "sum(rate(kong_http_requests_total{job=\"kong-gateway\",consumer!=\"\"}[5m])) by (consumer, service)",
+            "legend": "{{consumer}} → {{service}}",
+            "disabled": false
+          }
+        ]
+      },
+      "yAxisUnit": "reqps",
+      "nullZeroValues": "zero",
+      "fillSpans": false,
+      "timePreference": "GLOBAL_TIME",
+      "thresholds": [],
+      "softMin": 0,
+      "softMax": null
+    },
+    {
+      "id": "lua-memory",
+      "title": "Lua Shared Dict Memory Usage",
+      "description": "Used vs total bytes in Kong's Lua shared dictionaries (cache, rate limiting, health checks, etc.)",
+      "panelTypes": "graph",
+      "isStacked": false,
+      "opacity": "1",
+      "query": {
+        "queryType": "promql",
+        "promql": [
+          {
+            "name": "A",
+            "query": "kong_memory_lua_shared_dict_bytes{job=\"kong-gateway\"}",
+            "legend": "used — {{shared_dict}}",
+            "disabled": false
+          },
+          {
+            "name": "B",
+            "query": "kong_memory_lua_shared_dict_total_bytes{job=\"kong-gateway\"}",
+            "legend": "total — {{shared_dict}}",
+            "disabled": false
+          }
+        ]
+      },
+      "yAxisUnit": "bytes",
+      "nullZeroValues": "zero",
+      "fillSpans": false,
+      "timePreference": "GLOBAL_TIME",
+      "thresholds": [],
+      "softMin": 0,
+      "softMax": null
+    }
+  ]
+}

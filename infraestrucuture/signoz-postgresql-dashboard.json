@@ -1,0 +1,692 @@
+{
+  "title": "PostgreSQL - Top Queries & Performance",
+  "description": "Monitorização do PostgreSQL com pg_stat_statements e pg_exporter. Inclui top queries por chamadas, queries mais lentas, métricas de performance e cache.",
+  "tags": ["postgresql", "database", "pg_stat_statements", "pg_exporter", "performance"],
+  "version": "v4",
+  "dotMigrated": false,
+  "uploadedGrafana": false,
+  "variables": {
+    "var-datname": {
+      "allSelected": false,
+      "customValue": "",
+      "description": "Nome da base de dados PostgreSQL",
+      "id": "var-datname",
+      "modificationUUID": "var-datname-mod",
+      "multiSelect": false,
+      "name": "datname",
+      "order": 1,
+      "queryValue": "",
+      "selectedValue": "",
+      "showALLOption": false,
+      "sort": "DISABLED",
+      "textboxValue": "",
+      "type": "TEXTBOX"
+    },
+    "var-instance": {
+      "allSelected": false,
+      "customValue": "",
+      "description": "Endereço do servidor PostgreSQL (host:port)",
+      "id": "var-instance",
+      "modificationUUID": "var-instance-mod",
+      "multiSelect": false,
+      "name": "instance",
+      "order": 2,
+      "queryValue": "",
+      "selectedValue": "",
+      "showALLOption": false,
+      "sort": "DISABLED",
+      "textboxValue": "",
+      "type": "TEXTBOX"
+    }
+  },
+  "layout": [
+    { "h": 1, "i": "row-overview", "maxH": 1, "minH": 1, "minW": 12, "moved": false, "static": false, "w": 12, "x": 0, "y": 0 },
+    { "h": 3, "i": "stat-connections", "moved": false, "static": false, "w": 3, "x": 0, "y": 1 },
+    { "h": 3, "i": "stat-tps", "moved": false, "static": false, "w": 3, "x": 3, "y": 1 },
+    { "h": 3, "i": "stat-cache-hit", "moved": false, "static": false, "w": 3, "x": 6, "y": 1 },
+    { "h": 3, "i": "stat-deadlocks", "moved": false, "static": false, "w": 3, "x": 9, "y": 1 },
+
+    { "h": 1, "i": "row-activity", "maxH": 1, "minH": 1, "minW": 12, "moved": false, "static": false, "w": 12, "x": 0, "y": 4 },
+    { "h": 6, "i": "graph-connections", "moved": false, "static": false, "w": 6, "x": 0, "y": 5 },
+    { "h": 6, "i": "graph-tps", "moved": false, "static": false, "w": 6, "x": 6, "y": 5 },
+    { "h": 6, "i": "graph-rows", "moved": false, "static": false, "w": 6, "x": 0, "y": 11 },
+    { "h": 6, "i": "graph-locks", "moved": false, "static": false, "w": 6, "x": 6, "y": 11 },
+
+    { "h": 1, "i": "row-top-calls", "maxH": 1, "minH": 1, "minW": 12, "moved": false, "static": false, "w": 12, "x": 0, "y": 17 },
+    { "h": 8, "i": "table-top-calls", "moved": false, "static": false, "w": 12, "x": 0, "y": 18 },
+
+    { "h": 1, "i": "row-slowest", "maxH": 1, "minH": 1, "minW": 12, "moved": false, "static": false, "w": 12, "x": 0, "y": 26 },
+    { "h": 8, "i": "table-slowest", "moved": false, "static": false, "w": 12, "x": 0, "y": 27 },
+
+    { "h": 1, "i": "row-total-time", "maxH": 1, "minH": 1, "minW": 12, "moved": false, "static": false, "w": 12, "x": 0, "y": 35 },
+    { "h": 8, "i": "table-total-time", "moved": false, "static": false, "w": 12, "x": 0, "y": 36 },
+
+    { "h": 1, "i": "row-top-rows", "maxH": 1, "minH": 1, "minW": 12, "moved": false, "static": false, "w": 12, "x": 0, "y": 44 },
+    { "h": 8, "i": "table-top-rows", "moved": false, "static": false, "w": 12, "x": 0, "y": 45 },
+
+    { "h": 1, "i": "row-buffer", "maxH": 1, "minH": 1, "minW": 12, "moved": false, "static": false, "w": 12, "x": 0, "y": 53 },
+    { "h": 6, "i": "graph-cache-hit-ratio", "moved": false, "static": false, "w": 6, "x": 0, "y": 54 },
+    { "h": 6, "i": "graph-blk-io", "moved": false, "static": false, "w": 6, "x": 6, "y": 54 }
+  ],
+  "widgets": [
+
+    {
+      "id": "row-overview",
+      "title": "Visão Geral",
+      "panelTypes": "row",
+      "description": "",
+      "isCollapsed": false,
+      "query": {
+        "queryType": "builder",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "row-overview-q"
+      },
+      "nullZeroValues": "zero",
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "none"
+    },
+
+    {
+      "id": "stat-connections",
+      "title": "Conexões Activas",
+      "description": "Total de conexões activas em todas as bases de dados",
+      "panelTypes": "value",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [
+        { "index": 0, "type": "absolute", "value": 80, "color": "#F5A623" },
+        { "index": 1, "type": "absolute", "value": 95, "color": "#FF0B0B" }
+      ],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "stat-connections-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "Conexões",
+            "name": "A",
+            "query": "sum(pg_stat_database_numbackends{datname!~\"template.*|postgres\"})"
+          }
+        ]
+      }
+    },
+
+    {
+      "id": "stat-tps",
+      "title": "Transacções / seg",
+      "description": "Taxa combinada de commits e rollbacks por segundo",
+      "panelTypes": "value",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "stat-tps-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "TPS",
+            "name": "A",
+            "query": "sum(rate(pg_stat_database_xact_commit{datname!~\"template.*|postgres\"}[5m]) + rate(pg_stat_database_xact_rollback{datname!~\"template.*|postgres\"}[5m]))"
+          }
+        ]
+      }
+    },
+
+    {
+      "id": "stat-cache-hit",
+      "title": "Cache Hit Ratio",
+      "description": "Percentagem de blocos lidos da cache vs disco. Ideal > 99%",
+      "panelTypes": "value",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [
+        { "index": 0, "type": "percentage", "value": 95, "color": "#FF0B0B" }
+      ],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "percentunit",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "stat-cache-hit-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "Cache Hit",
+            "name": "A",
+            "query": "sum(pg_stat_database_blks_hit{datname!~\"template.*|postgres\"}) / (sum(pg_stat_database_blks_hit{datname!~\"template.*|postgres\"}) + sum(pg_stat_database_blks_read{datname!~\"template.*|postgres\"}))"
+          }
+        ]
+      }
+    },
+
+    {
+      "id": "stat-deadlocks",
+      "title": "Deadlocks / seg",
+      "description": "Taxa de deadlocks detectados. Deve ser próximo de zero.",
+      "panelTypes": "value",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [
+        { "index": 0, "type": "absolute", "value": 0.01, "color": "#FF0B0B" }
+      ],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "stat-deadlocks-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "Deadlocks/s",
+            "name": "A",
+            "query": "sum(rate(pg_stat_database_deadlocks{datname!~\"template.*|postgres\"}[5m]))"
+          }
+        ]
+      }
+    },
+
+    {
+      "id": "row-activity",
+      "title": "Actividade da Base de Dados",
+      "panelTypes": "row",
+      "description": "",
+      "isCollapsed": false,
+      "query": {
+        "queryType": "builder",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "row-activity-q"
+      },
+      "nullZeroValues": "zero",
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "none"
+    },
+
+    {
+      "id": "graph-connections",
+      "title": "Conexões por Base de Dados",
+      "description": "Número de conexões activas ao longo do tempo, por base de dados",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "graph-connections-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "{{datname}}",
+            "name": "A",
+            "query": "pg_stat_database_numbackends{datname!~\"template.*|postgres\"}"
+          }
+        ]
+      }
+    },
+
+    {
+      "id": "graph-tps",
+      "title": "Commits e Rollbacks / seg",
+      "description": "Taxa de commits e rollbacks por segundo, por base de dados",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "graph-tps-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "commits - {{datname}}",
+            "name": "A",
+            "query": "rate(pg_stat_database_xact_commit{datname!~\"template.*|postgres\"}[5m])"
+          },
+          {
+            "disabled": false,
+            "legend": "rollbacks - {{datname}}",
+            "name": "B",
+            "query": "rate(pg_stat_database_xact_rollback{datname!~\"template.*|postgres\"}[5m])"
+          }
+        ]
+      }
+    },
+
+    {
+      "id": "graph-rows",
+      "title": "Linhas por Operação / seg",
+      "description": "Taxa de linhas retornadas, inseridas, actualizadas e eliminadas por segundo",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "graph-rows-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "returned",
+            "name": "A",
+            "query": "sum(rate(pg_stat_database_tup_returned{datname!~\"template.*|postgres\"}[5m]))"
+          },
+          {
+            "disabled": false,
+            "legend": "inserted",
+            "name": "B",
+            "query": "sum(rate(pg_stat_database_tup_inserted{datname!~\"template.*|postgres\"}[5m]))"
+          },
+          {
+            "disabled": false,
+            "legend": "updated",
+            "name": "C",
+            "query": "sum(rate(pg_stat_database_tup_updated{datname!~\"template.*|postgres\"}[5m]))"
+          },
+          {
+            "disabled": false,
+            "legend": "deleted",
+            "name": "D",
+            "query": "sum(rate(pg_stat_database_tup_deleted{datname!~\"template.*|postgres\"}[5m]))"
+          }
+        ]
+      }
+    },
+
+    {
+      "id": "graph-locks",
+      "title": "Locks por Modo",
+      "description": "Número de locks activos por modo (AccessShare, RowExclusive, ExclusiveLock, etc.)",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": true,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "graph-locks-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "{{mode}}",
+            "name": "A",
+            "query": "pg_locks_count{datname!~\"template.*|postgres\"}"
+          }
+        ]
+      }
+    },
+
+    {
+      "id": "row-top-calls",
+      "title": "Top 10 — Queries por Volume de Chamadas",
+      "panelTypes": "row",
+      "description": "",
+      "isCollapsed": false,
+      "query": {
+        "queryType": "builder",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "row-top-calls-q"
+      },
+      "nullZeroValues": "zero",
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "none"
+    },
+
+    {
+      "id": "table-top-calls",
+      "title": "Top 10 Queries por Chamadas / seg",
+      "description": "Queries executadas com maior frequência. Candidatas a cache ou optimização de índices. Métricas: pg_stat_statements_calls (rate 5m).",
+      "panelTypes": "table",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "table-top-calls-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "calls/s — {{query}} [db: {{datname}}, user: {{usename}}]",
+            "name": "A",
+            "query": "topk(10, rate(pg_stat_statements_calls{datname!~\"template.*|postgres\"}[5m]))"
+          }
+        ]
+      }
+    },
+
+    {
+      "id": "row-slowest",
+      "title": "Top 10 — Queries Mais Lentas (Tempo Médio)",
+      "panelTypes": "row",
+      "description": "",
+      "isCollapsed": false,
+      "query": {
+        "queryType": "builder",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "row-slowest-q"
+      },
+      "nullZeroValues": "zero",
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "none"
+    },
+
+    {
+      "id": "table-slowest",
+      "title": "Top 10 Queries Mais Lentas — Tempo Médio por Execução (ms)",
+      "description": "Queries com maior latência média por execução. Candidatas a optimização de plano de execução, índices ou reescrita. Métricas: pg_stat_statements_mean_exec_time (PG≥13) ou pg_stat_statements_mean_time (PG<13).",
+      "panelTypes": "table",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "ms",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "table-slowest-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "mean_time ms — {{query}} [db: {{datname}}, user: {{usename}}]",
+            "name": "A",
+            "query": "topk(10, pg_stat_statements_mean_exec_time{datname!~\"template.*|postgres\"})"
+          },
+          {
+            "disabled": false,
+            "legend": "mean_time ms (PG<13) — {{query}} [db: {{datname}}, user: {{usename}}]",
+            "name": "B",
+            "query": "topk(10, pg_stat_statements_mean_time{datname!~\"template.*|postgres\"})"
+          }
+        ]
+      }
+    },
+
+    {
+      "id": "row-total-time",
+      "title": "Top 10 — Queries por Tempo Total de Execução",
+      "panelTypes": "row",
+      "description": "",
+      "isCollapsed": false,
+      "query": {
+        "queryType": "builder",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "row-total-time-q"
+      },
+      "nullZeroValues": "zero",
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "none"
+    },
+
+    {
+      "id": "table-total-time",
+      "title": "Top 10 Queries por Tempo Total Consumido (ms/seg)",
+      "description": "Queries que consomem mais tempo total de CPU/IO do servidor. Combinação de volume e lentidão — prioridade máxima para optimização. Métricas: pg_stat_statements_total_exec_time (PG≥13) ou pg_stat_statements_total_time (PG<13).",
+      "panelTypes": "table",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "ms",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "table-total-time-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "total_exec_time ms/s — {{query}} [db: {{datname}}, user: {{usename}}]",
+            "name": "A",
+            "query": "topk(10, rate(pg_stat_statements_total_exec_time{datname!~\"template.*|postgres\"}[5m]))"
+          },
+          {
+            "disabled": false,
+            "legend": "total_time ms/s (PG<13) — {{query}} [db: {{datname}}, user: {{usename}}]",
+            "name": "B",
+            "query": "topk(10, rate(pg_stat_statements_total_time{datname!~\"template.*|postgres\"}[5m]))"
+          }
+        ]
+      }
+    },
+
+    {
+      "id": "row-top-rows",
+      "title": "Top 10 — Queries por Linhas Processadas",
+      "panelTypes": "row",
+      "description": "",
+      "isCollapsed": false,
+      "query": {
+        "queryType": "builder",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "row-top-rows-q"
+      },
+      "nullZeroValues": "zero",
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "none"
+    },
+
+    {
+      "id": "table-top-rows",
+      "title": "Top 10 Queries por Linhas Retornadas / seg",
+      "description": "Queries que retornam mais linhas — potencial falta de paginação, índices seletivos, ou full table scans. Métricas: pg_stat_statements_rows.",
+      "panelTypes": "table",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "table-top-rows-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "rows/s — {{query}} [db: {{datname}}, user: {{usename}}]",
+            "name": "A",
+            "query": "topk(10, rate(pg_stat_statements_rows{datname!~\"template.*|postgres\"}[5m]))"
+          }
+        ]
+      }
+    },
+
+    {
+      "id": "row-buffer",
+      "title": "Buffer Cache & I/O de Blocos",
+      "panelTypes": "row",
+      "description": "",
+      "isCollapsed": false,
+      "query": {
+        "queryType": "builder",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "row-buffer-q"
+      },
+      "nullZeroValues": "zero",
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "none"
+    },
+
+    {
+      "id": "graph-cache-hit-ratio",
+      "title": "Cache Hit Ratio por Base de Dados",
+      "description": "Percentagem de blocos servidos pela shared_buffers (cache) vs lidos do disco. Valores abaixo de 95% indicam que shared_buffers pode estar subdimensionado.",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [
+        { "index": 0, "type": "percentage", "value": 95, "color": "#FF0B0B" }
+      ],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "percentunit",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "graph-cache-hit-ratio-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "{{datname}}",
+            "name": "A",
+            "query": "pg_stat_database_blks_hit{datname!~\"template.*|postgres\"} / (pg_stat_database_blks_hit{datname!~\"template.*|postgres\"} + pg_stat_database_blks_read{datname!~\"template.*|postgres\"})"
+          }
+        ]
+      }
+    },
+
+    {
+      "id": "graph-blk-io",
+      "title": "Blocos Lidos do Disco / seg",
+      "description": "Taxa de leitura de blocos a partir do disco físico. Picos elevados indicam pressão na shared_buffers ou queries com full table scans.",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "graph-blk-io-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "blks_read/s — {{datname}}",
+            "name": "A",
+            "query": "rate(pg_stat_database_blks_read{datname!~\"template.*|postgres\"}[5m])"
+          },
+          {
+            "disabled": false,
+            "legend": "blks_hit/s — {{datname}}",
+            "name": "B",
+            "query": "rate(pg_stat_database_blks_hit{datname!~\"template.*|postgres\"}[5m])"
+          }
+        ]
+      }
+    }
+
+  ]
+}

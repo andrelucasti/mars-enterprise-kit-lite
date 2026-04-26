@@ -1,0 +1,41 @@
+global:
+  cloud: others
+  clusterName: andrelab
+  deploymentEnvironment: homelab
+otelCollectorEndpoint: signoz-otel-collector.signoz.svc.cluster.local:4317
+otelInsecure: true
+presets:
+  otlpExporter:
+    enabled: true
+  loggingExporter:
+    enabled: false
+otelAgent:
+  config:
+    receivers:
+      prometheus:
+        config:
+          scrape_configs:
+            - job_name: 'node-exporter'
+              scrape_interval: 5s
+              static_configs:
+                - targets: ['192.168.1.107:9100']
+                  labels:
+                    host: 'andrelab'
+            - job_name: 'pg-server-exporter'
+              scrape_interval: 5s
+              static_configs:
+                - targets: ['100.94.93.48:9187']
+                  labels:
+                    host: 'andrelab'
+            - job_name: 'kong-gateway'
+              scrape_interval: 15s
+              static_configs:
+                - targets: ['kong-gateway-status.kong.svc.cluster.local:8100']
+                  labels:
+                    host: 'andrelab'
+    service:
+      pipelines:
+        metrics:
+          receivers: [otlp, prometheus]
+          processors: [batch]
+          exporters: [otlp]

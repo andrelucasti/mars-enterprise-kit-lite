@@ -1,0 +1,949 @@
+{
+  "title": "Node Exporter - System Metrics",
+  "description": "Comprehensive host monitoring using Prometheus Node Exporter metrics. Covers CPU, Memory, Disk I/O, Network, Filesystem, System Load, and Process stats.",
+  "tags": ["node-exporter", "cpu", "memory", "disk", "network", "linux"],
+  "version": "v4",
+  "dotMigrated": false,
+  "uploadedGrafana": false,
+  "variables": {
+    "var-instance": {
+      "allSelected": false,
+      "customValue": "",
+      "description": "Target host (node_exporter instance)",
+      "id": "var-instance",
+      "modificationUUID": "var-instance-mod",
+      "multiSelect": false,
+      "name": "instance",
+      "order": 1,
+      "queryValue": "",
+      "selectedValue": "",
+      "showALLOption": false,
+      "sort": "DISABLED",
+      "textboxValue": "",
+      "type": "TEXTBOX"
+    }
+  },
+  "layout": [
+    {
+      "h": 1, "i": "row-overview",
+      "maxH": 1, "minH": 1, "minW": 12,
+      "moved": false, "static": false,
+      "w": 12, "x": 0, "y": 0
+    },
+    {
+      "h": 3, "i": "stat-cpu",
+      "moved": false, "static": false,
+      "w": 3, "x": 0, "y": 1
+    },
+    {
+      "h": 3, "i": "stat-memory",
+      "moved": false, "static": false,
+      "w": 3, "x": 3, "y": 1
+    },
+    {
+      "h": 3, "i": "stat-disk-used",
+      "moved": false, "static": false,
+      "w": 3, "x": 6, "y": 1
+    },
+    {
+      "h": 3, "i": "stat-uptime",
+      "moved": false, "static": false,
+      "w": 3, "x": 9, "y": 1
+    },
+    {
+      "h": 1, "i": "row-cpu",
+      "maxH": 1, "minH": 1, "minW": 12,
+      "moved": false, "static": false,
+      "w": 12, "x": 0, "y": 4
+    },
+    {
+      "h": 6, "i": "graph-cpu-usage",
+      "moved": false, "static": false,
+      "w": 6, "x": 0, "y": 5
+    },
+    {
+      "h": 6, "i": "graph-cpu-modes",
+      "moved": false, "static": false,
+      "w": 6, "x": 6, "y": 5
+    },
+    {
+      "h": 6, "i": "graph-load-avg",
+      "moved": false, "static": false,
+      "w": 6, "x": 0, "y": 11
+    },
+    {
+      "h": 6, "i": "graph-context-switches",
+      "moved": false, "static": false,
+      "w": 6, "x": 6, "y": 11
+    },
+    {
+      "h": 1, "i": "row-memory",
+      "maxH": 1, "minH": 1, "minW": 12,
+      "moved": false, "static": false,
+      "w": 12, "x": 0, "y": 17
+    },
+    {
+      "h": 6, "i": "graph-memory-usage",
+      "moved": false, "static": false,
+      "w": 6, "x": 0, "y": 18
+    },
+    {
+      "h": 6, "i": "graph-memory-breakdown",
+      "moved": false, "static": false,
+      "w": 6, "x": 6, "y": 18
+    },
+    {
+      "h": 6, "i": "graph-swap-usage",
+      "moved": false, "static": false,
+      "w": 6, "x": 0, "y": 24
+    },
+    {
+      "h": 1, "i": "row-disk",
+      "maxH": 1, "minH": 1, "minW": 12,
+      "moved": false, "static": false,
+      "w": 12, "x": 0, "y": 30
+    },
+    {
+      "h": 6, "i": "graph-disk-io-bytes",
+      "moved": false, "static": false,
+      "w": 6, "x": 0, "y": 31
+    },
+    {
+      "h": 6, "i": "graph-disk-iops",
+      "moved": false, "static": false,
+      "w": 6, "x": 6, "y": 31
+    },
+    {
+      "h": 6, "i": "graph-disk-io-time",
+      "moved": false, "static": false,
+      "w": 6, "x": 0, "y": 37
+    },
+    {
+      "h": 6, "i": "graph-disk-queue",
+      "moved": false, "static": false,
+      "w": 6, "x": 6, "y": 37
+    },
+    {
+      "h": 1, "i": "row-network",
+      "maxH": 1, "minH": 1, "minW": 12,
+      "moved": false, "static": false,
+      "w": 12, "x": 0, "y": 43
+    },
+    {
+      "h": 6, "i": "graph-net-bytes",
+      "moved": false, "static": false,
+      "w": 6, "x": 0, "y": 44
+    },
+    {
+      "h": 6, "i": "graph-net-packets",
+      "moved": false, "static": false,
+      "w": 6, "x": 6, "y": 44
+    },
+    {
+      "h": 6, "i": "graph-net-errors",
+      "moved": false, "static": false,
+      "w": 6, "x": 0, "y": 50
+    },
+    {
+      "h": 1, "i": "row-filesystem",
+      "maxH": 1, "minH": 1, "minW": 12,
+      "moved": false, "static": false,
+      "w": 12, "x": 0, "y": 56
+    },
+    {
+      "h": 8, "i": "table-filesystem",
+      "moved": false, "static": false,
+      "w": 12, "x": 0, "y": 57
+    }
+  ],
+  "widgets": [
+    {
+      "id": "row-overview",
+      "title": "Overview",
+      "panelTypes": "row",
+      "description": "",
+      "isCollapsed": false,
+      "query": {
+        "queryType": "builder",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "row-overview-q"
+      },
+      "nullZeroValues": "zero",
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "none"
+    },
+    {
+      "id": "stat-cpu",
+      "title": "CPU Usage",
+      "description": "Average CPU utilisation across all cores",
+      "panelTypes": "value",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [
+        { "index": 0, "type": "percentage", "value": 80, "color": "#FF0B0B" }
+      ],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "percentunit",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "stat-cpu-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "CPU Usage",
+            "name": "A",
+            "query": "1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))"
+          }
+        ]
+      }
+    },
+    {
+      "id": "stat-memory",
+      "title": "Memory Usage",
+      "description": "Used memory / Total memory",
+      "panelTypes": "value",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [
+        { "index": 0, "type": "percentage", "value": 85, "color": "#FF0B0B" }
+      ],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "percentunit",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "stat-memory-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "Memory Usage",
+            "name": "A",
+            "query": "1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "stat-disk-used",
+      "title": "Root Disk Usage",
+      "description": "Used space on root (/) filesystem",
+      "panelTypes": "value",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [
+        { "index": 0, "type": "percentage", "value": 80, "color": "#FF0B0B" }
+      ],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "percentunit",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "stat-disk-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "Disk Usage /",
+            "name": "A",
+            "query": "1 - (node_filesystem_avail_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay\"})"
+          }
+        ]
+      }
+    },
+    {
+      "id": "stat-uptime",
+      "title": "System Uptime",
+      "description": "Time since last reboot",
+      "panelTypes": "value",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "s",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "stat-uptime-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "Uptime",
+            "name": "A",
+            "query": "node_time_seconds - node_boot_time_seconds"
+          }
+        ]
+      }
+    },
+    {
+      "id": "row-cpu",
+      "title": "CPU",
+      "panelTypes": "row",
+      "description": "",
+      "isCollapsed": false,
+      "query": {
+        "queryType": "builder",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "row-cpu-q"
+      },
+      "nullZeroValues": "zero",
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "none"
+    },
+    {
+      "id": "graph-cpu-usage",
+      "title": "CPU Usage %",
+      "description": "Total CPU utilisation (all cores combined, idle subtracted)",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "percentunit",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "graph-cpu-usage-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "CPU Busy",
+            "name": "A",
+            "query": "1 - avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))"
+          }
+        ]
+      }
+    },
+    {
+      "id": "graph-cpu-modes",
+      "title": "CPU Time by Mode",
+      "description": "Breakdown of CPU time: user, system, iowait, nice, irq, softirq, steal",
+      "panelTypes": "graph",
+      "fillSpans": true,
+      "isStacked": true,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "percentunit",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "graph-cpu-modes-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "{{mode}}",
+            "name": "A",
+            "query": "avg by (instance, mode) (rate(node_cpu_seconds_total{mode!=\"idle\"}[5m]))"
+          }
+        ]
+      }
+    },
+    {
+      "id": "graph-load-avg",
+      "title": "System Load Average",
+      "description": "1m, 5m and 15m load averages. Values above CPU count indicate saturation.",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "graph-load-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "load 1m",
+            "name": "A",
+            "query": "node_load1"
+          },
+          {
+            "disabled": false,
+            "legend": "load 5m",
+            "name": "B",
+            "query": "node_load5"
+          },
+          {
+            "disabled": false,
+            "legend": "load 15m",
+            "name": "C",
+            "query": "node_load15"
+          },
+          {
+            "disabled": false,
+            "legend": "CPU cores",
+            "name": "D",
+            "query": "count by (instance) (node_cpu_seconds_total{mode=\"idle\"})"
+          }
+        ]
+      }
+    },
+    {
+      "id": "graph-context-switches",
+      "title": "Context Switches / Interrupts",
+      "description": "Rate of CPU context switches and hardware/software interrupts per second",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "graph-ctx-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "Context Switches",
+            "name": "A",
+            "query": "rate(node_context_switches_total[5m])"
+          },
+          {
+            "disabled": false,
+            "legend": "Hardware Interrupts",
+            "name": "B",
+            "query": "rate(node_intr_total[5m])"
+          }
+        ]
+      }
+    },
+    {
+      "id": "row-memory",
+      "title": "Memory",
+      "panelTypes": "row",
+      "description": "",
+      "isCollapsed": false,
+      "query": {
+        "queryType": "builder",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "row-memory-q"
+      },
+      "nullZeroValues": "zero",
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "none"
+    },
+    {
+      "id": "graph-memory-usage",
+      "title": "Memory Usage %",
+      "description": "Percentage of RAM in use (used = total - available)",
+      "panelTypes": "graph",
+      "fillSpans": true,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "percentunit",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "graph-mem-pct-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "Used %",
+            "name": "A",
+            "query": "1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "graph-memory-breakdown",
+      "title": "Memory Breakdown (Bytes)",
+      "description": "Absolute memory split: used, buffers, cached, free",
+      "panelTypes": "graph",
+      "fillSpans": true,
+      "isStacked": true,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "bytes",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "graph-mem-breakdown-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "Used",
+            "name": "A",
+            "query": "node_memory_MemTotal_bytes - node_memory_MemFree_bytes - node_memory_Buffers_bytes - node_memory_Cached_bytes"
+          },
+          {
+            "disabled": false,
+            "legend": "Buffers",
+            "name": "B",
+            "query": "node_memory_Buffers_bytes"
+          },
+          {
+            "disabled": false,
+            "legend": "Cached",
+            "name": "C",
+            "query": "node_memory_Cached_bytes"
+          },
+          {
+            "disabled": false,
+            "legend": "Free",
+            "name": "D",
+            "query": "node_memory_MemFree_bytes"
+          }
+        ]
+      }
+    },
+    {
+      "id": "graph-swap-usage",
+      "title": "Swap Usage",
+      "description": "Swap space utilisation. High swap usage may indicate memory pressure.",
+      "panelTypes": "graph",
+      "fillSpans": true,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "bytes",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "graph-swap-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "Swap Used",
+            "name": "A",
+            "query": "node_memory_SwapTotal_bytes - node_memory_SwapFree_bytes"
+          },
+          {
+            "disabled": false,
+            "legend": "Swap Total",
+            "name": "B",
+            "query": "node_memory_SwapTotal_bytes"
+          }
+        ]
+      }
+    },
+    {
+      "id": "row-disk",
+      "title": "Disk I/O",
+      "panelTypes": "row",
+      "description": "",
+      "isCollapsed": false,
+      "query": {
+        "queryType": "builder",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "row-disk-q"
+      },
+      "nullZeroValues": "zero",
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "none"
+    },
+    {
+      "id": "graph-disk-io-bytes",
+      "title": "Disk I/O — Throughput (Bytes/s)",
+      "description": "Read and write throughput per device",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "Bps",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "graph-disk-bytes-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "{{device}} read",
+            "name": "A",
+            "query": "rate(node_disk_read_bytes_total[5m])"
+          },
+          {
+            "disabled": false,
+            "legend": "{{device}} write",
+            "name": "B",
+            "query": "rate(node_disk_written_bytes_total[5m])"
+          }
+        ]
+      }
+    },
+    {
+      "id": "graph-disk-iops",
+      "title": "Disk IOPS",
+      "description": "Read and write operations per second per device",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "iops",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "graph-disk-iops-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "{{device}} reads",
+            "name": "A",
+            "query": "rate(node_disk_reads_completed_total[5m])"
+          },
+          {
+            "disabled": false,
+            "legend": "{{device}} writes",
+            "name": "B",
+            "query": "rate(node_disk_writes_completed_total[5m])"
+          }
+        ]
+      }
+    },
+    {
+      "id": "graph-disk-io-time",
+      "title": "Disk I/O Time (ms/s)",
+      "description": "Time spent doing disk I/O per device — a value near 1000 ms/s means the device is fully saturated",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "ms",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "graph-disk-iotime-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "{{device}} io_time",
+            "name": "A",
+            "query": "rate(node_disk_io_time_seconds_total[5m]) * 1000"
+          }
+        ]
+      }
+    },
+    {
+      "id": "graph-disk-queue",
+      "title": "Disk I/O Queue Depth",
+      "description": "Average number of I/O operations in flight. High values indicate disk saturation.",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "short",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "graph-disk-queue-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "{{device}} queue",
+            "name": "A",
+            "query": "rate(node_disk_io_time_weighted_seconds_total[5m])"
+          }
+        ]
+      }
+    },
+    {
+      "id": "row-network",
+      "title": "Network",
+      "panelTypes": "row",
+      "description": "",
+      "isCollapsed": false,
+      "query": {
+        "queryType": "builder",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "row-network-q"
+      },
+      "nullZeroValues": "zero",
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "none"
+    },
+    {
+      "id": "graph-net-bytes",
+      "title": "Network Traffic (Bytes/s)",
+      "description": "Inbound and outbound bytes per second per network interface",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "Bps",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "graph-net-bytes-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "{{device}} receive",
+            "name": "A",
+            "query": "rate(node_network_receive_bytes_total{device!~\"lo|veth.*|docker.*|br-.*\"}[5m])"
+          },
+          {
+            "disabled": false,
+            "legend": "{{device}} transmit",
+            "name": "B",
+            "query": "rate(node_network_transmit_bytes_total{device!~\"lo|veth.*|docker.*|br-.*\"}[5m])"
+          }
+        ]
+      }
+    },
+    {
+      "id": "graph-net-packets",
+      "title": "Network Packets/s",
+      "description": "Packets received and transmitted per second per interface",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "pps",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "graph-net-pkt-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "{{device}} rx packets",
+            "name": "A",
+            "query": "rate(node_network_receive_packets_total{device!~\"lo|veth.*|docker.*|br-.*\"}[5m])"
+          },
+          {
+            "disabled": false,
+            "legend": "{{device}} tx packets",
+            "name": "B",
+            "query": "rate(node_network_transmit_packets_total{device!~\"lo|veth.*|docker.*|br-.*\"}[5m])"
+          }
+        ]
+      }
+    },
+    {
+      "id": "graph-net-errors",
+      "title": "Network Errors & Drops",
+      "description": "Receive/transmit errors and dropped packets per second. Non-zero values indicate NIC issues.",
+      "panelTypes": "graph",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "pps",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "graph-net-err-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "{{device}} rx errors",
+            "name": "A",
+            "query": "rate(node_network_receive_errs_total{device!~\"lo|veth.*|docker.*|br-.*\"}[5m])"
+          },
+          {
+            "disabled": false,
+            "legend": "{{device}} tx errors",
+            "name": "B",
+            "query": "rate(node_network_transmit_errs_total{device!~\"lo|veth.*|docker.*|br-.*\"}[5m])"
+          },
+          {
+            "disabled": false,
+            "legend": "{{device}} rx drops",
+            "name": "C",
+            "query": "rate(node_network_receive_drop_total{device!~\"lo|veth.*|docker.*|br-.*\"}[5m])"
+          },
+          {
+            "disabled": false,
+            "legend": "{{device}} tx drops",
+            "name": "D",
+            "query": "rate(node_network_transmit_drop_total{device!~\"lo|veth.*|docker.*|br-.*\"}[5m])"
+          }
+        ]
+      }
+    },
+    {
+      "id": "row-filesystem",
+      "title": "Filesystem",
+      "panelTypes": "row",
+      "description": "",
+      "isCollapsed": false,
+      "query": {
+        "queryType": "builder",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "row-fs-q"
+      },
+      "nullZeroValues": "zero",
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "none"
+    },
+    {
+      "id": "table-filesystem",
+      "title": "Filesystem Usage by Mountpoint",
+      "description": "Disk space used, available, and usage % for every mounted filesystem (tmpfs and overlay excluded)",
+      "panelTypes": "table",
+      "fillSpans": false,
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "softMax": 0,
+      "softMin": 0,
+      "thresholds": [
+        { "index": 0, "type": "percentage", "value": 80, "color": "#FF0B0B" }
+      ],
+      "timePreferance": "GLOBAL_TIME",
+      "yAxisUnit": "percentunit",
+      "query": {
+        "queryType": "promql",
+        "builder": { "queryData": [], "queryFormulas": [] },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "table-fs-q",
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "{{mountpoint}} ({{device}}) used %",
+            "name": "A",
+            "query": "1 - (node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay|squashfs\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|squashfs\"})"
+          },
+          {
+            "disabled": false,
+            "legend": "{{mountpoint}} used bytes",
+            "name": "B",
+            "query": "node_filesystem_size_bytes{fstype!~\"tmpfs|overlay|squashfs\"} - node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay|squashfs\"}"
+          },
+          {
+            "disabled": false,
+            "legend": "{{mountpoint}} free bytes",
+            "name": "C",
+            "query": "node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay|squashfs\"}"
+          }
+        ]
+      }
+    }
+  ]
+}

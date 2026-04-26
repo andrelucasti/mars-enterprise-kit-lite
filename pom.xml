@@ -29,6 +29,13 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+        <!-- Spring Boot Actuator for health check endpoints -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+            <scope>compile</scope>
+            <version>${spring-boot.version}</version> <!-- Usar versão gerida pelo pom -->
+        </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -45,6 +52,8 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
+            <scope>compile</scope>
+            <version>${spring-boot.version}</version> <!-- Usar versão gerida pelo pom -->
         </dependency>
         <dependency>
             <groupId>io.micrometer</groupId>
