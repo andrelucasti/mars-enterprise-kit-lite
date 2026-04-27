@@ -13,6 +13,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
@@ -134,5 +135,120 @@ class OrderControllerE2ETest extends AbstractIntegrationTest {
             .get("/{id}", UUID.randomUUID().toString())
         .then()
             .statusCode(404);
+    }
+
+    @Test
+    @DisplayName("POST /orders/{id}/cancel - should cancel a CREATED order and return 200 with status CANCELLED")
+    void shouldCancelCreatedOrderAndReturn200() {
+        var orderId = given()
+            .contentType(ContentType.JSON)
+            .body("""
+                {
+                    "customerId": "550e8400-e29b-41d4-a716-446655440000",
+                    "items": [{"productId": "123e4567-e89b-12d3-a456-426614174000", "quantity": 1, "unitPrice": 99.99}]
+                }
+                """)
+        .when()
+            .post()
+        .then()
+            .statusCode(201)
+            .extract().jsonPath().getString("orderId");
+
+        given()
+        .when()
+            .post("/{id}/cancel", orderId)
+        .then()
+            .statusCode(200)
+            .contentType(ContentType.JSON)
+            .body("id", equalTo(orderId))
+            .body("status", equalTo("CANCELLED"));
+    }
+
+    @Test
+    @DisplayName("POST /orders/{id}/cancel - should return 400 when order is already cancelled")
+    void shouldReturn400WhenOrderIsAlreadyCancelled() {
+        var orderId = given()
+            .contentType(ContentType.JSON)
+            .body("""
+                {
+                    "customerId": "550e8400-e29b-41d4-a716-446655440000",
+                    "items": [{"productId": "123e4567-e89b-12d3-a456-426614174000", "quantity": 1, "unitPrice": 99.99}]
+                }
+                """)
+        .when()
+            .post()
+        .then()
+            .statusCode(201)
+            .extract().jsonPath().getString("orderId");
+
+        given()
+        .when()
+            .post("/{id}/cancel", orderId)
+        .then()
+            .statusCode(200);
+
+        given()
+        .when()
+            .post("/{id}/cancel", orderId)
+        .then()
+            .statusCode(400)
+            .contentType(ContentType.JSON)
+            .body("error", notNullValue());
+    }
+
+    @Test
+    @DisplayName("POST /orders/{id}/cancel - should return 400 when cancelling a non-existent order")
+    void shouldReturn400WhenCancellingNonExistentOrder() {
+        given()
+        .when()
+            .post("/{id}/cancel", UUID.randomUUID().toString())
+        .then()
+            .statusCode(400)
+            .contentType(ContentType.JSON)
+            .body("error", containsString("Order not found"));
+    }
+
+    @Test
+    @DisplayName("POST /orders/{id}/cancel - should return 400 when order id is a malformed UUID")
+    void shouldReturn400WhenOrderIdIsMalformedUUID() {
+        given()
+        .when()
+            .post("/{id}/cancel", "not-a-uuid")
+        .then()
+            .statusCode(400)
+            .contentType(ContentType.JSON)
+            .body("error", equalTo("Invalid UUID format for parameter 'id'"));
+    }
+
+    @Test
+    @DisplayName("GET /orders/{id} - should return status CANCELLED after cancel")
+    void shouldReturnCancelledStatusAfterCancel() {
+        var orderId = given()
+            .contentType(ContentType.JSON)
+            .body("""
+                {
+                    "customerId": "550e8400-e29b-41d4-a716-446655440000",
+                    "items": [{"productId": "123e4567-e89b-12d3-a456-426614174000", "quantity": 1, "unitPrice": 99.99}]
+                }
+                """)
+        .when()
+            .post()
+        .then()
+            .statusCode(201)
+            .extract().jsonPath().getString("orderId");
+
+        given()
+        .when()
+            .post("/{id}/cancel", orderId)
+        .then()
+            .statusCode(200);
+
+        given()
+        .when()
+            .get("/{id}", orderId)
+        .then()
+            .statusCode(200)
+            .contentType(ContentType.JSON)
+            .body("status", equalTo("CANCELLED"));
     }
 }
