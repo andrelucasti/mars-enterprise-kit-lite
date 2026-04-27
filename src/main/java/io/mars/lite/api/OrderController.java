@@ -2,6 +2,7 @@ package io.mars.lite.api;
 
 import io.mars.lite.domain.OrderItem;
 import io.mars.lite.domain.OrderRepository;
+import io.mars.lite.domain.usecase.CancelOrderUseCase;
 import io.mars.lite.domain.usecase.CreateOrderUseCase;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -21,11 +23,15 @@ import java.util.stream.Collectors;
 public class OrderController {
 
     private final CreateOrderUseCase createOrderUseCase;
+    private final CancelOrderUseCase cancelOrderUseCase;
     private final OrderRepository orderRepository;
 
     public OrderController(CreateOrderUseCase createOrderUseCase,
+                           CancelOrderUseCase cancelOrderUseCase,
                            OrderRepository orderRepository) {
         this.createOrderUseCase = createOrderUseCase;
+        this.cancelOrderUseCase = Objects.requireNonNull(cancelOrderUseCase,
+                "cancelOrderUseCase cannot be null");
         this.orderRepository = orderRepository;
     }
 
@@ -40,6 +46,15 @@ public class OrderController {
         var orderId = createOrderUseCase.execute(input);
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(Map.of("orderId", orderId));
+    }
+
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<OrderResponse> cancelOrder(@PathVariable UUID id) {
+        cancelOrderUseCase.execute(id);
+        return orderRepository.findById(id)
+            .map(OrderResponse::from)
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/{id}")
