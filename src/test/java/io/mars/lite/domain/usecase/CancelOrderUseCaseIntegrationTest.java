@@ -2,9 +2,11 @@ package io.mars.lite.domain.usecase;
 
 import io.mars.lite.AbstractIntegrationTest;
 import io.mars.lite.domain.BusinessException;
-import io.mars.lite.domain.OrderItem;
 import io.mars.lite.domain.OrderStatus;
+import io.mars.lite.domain.Product;
 import io.mars.lite.infrastructure.persistence.OrderJpaRepository;
+import io.mars.lite.infrastructure.persistence.ProductEntity;
+import io.mars.lite.infrastructure.persistence.ProductJpaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,20 +30,30 @@ class CancelOrderUseCaseIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private OrderJpaRepository orderJpaRepository;
 
+    @Autowired
+    private ProductJpaRepository productJpaRepository;
+
     @BeforeEach
     void cleanUp() {
         orderJpaRepository.deleteAll();
+        productJpaRepository.deleteAll();
     }
 
     @Test
     @DisplayName("should cancel existing order")
     void shouldCancelExistingOrder() {
-        var items = Set.of(new OrderItem(UUID.randomUUID(), 1, new BigDecimal("50.00")));
+        // Arrange: Create a product first
+        var product = Product.create("Test Product", new BigDecimal("50.00"));
+        productJpaRepository.save(ProductEntity.of(product));
+
+        var items = Set.of(new CreateOrderUseCase.OrderItemInput(product.id(), 1));
         var orderId = createOrderUseCase.execute(
             new CreateOrderUseCase.Input(items, UUID.randomUUID()));
 
+        // Act
         cancelOrderUseCase.execute(orderId);
 
+        // Assert
         var entity = orderJpaRepository.findById(orderId).orElseThrow();
         assertThat(entity.getStatus()).isEqualTo(OrderStatus.CANCELLED);
     }

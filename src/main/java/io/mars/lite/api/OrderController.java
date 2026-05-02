@@ -1,6 +1,5 @@
 package io.mars.lite.api;
 
-import io.mars.lite.domain.OrderItem;
 import io.mars.lite.domain.OrderRepository;
 import io.mars.lite.domain.usecase.CreateOrderUseCase;
 import org.springframework.http.HttpStatus;
@@ -33,7 +32,7 @@ public class OrderController {
     public ResponseEntity<Map<String, UUID>> createOrder(
             @RequestBody CreateOrderRequest request) {
         var items = request.items().stream()
-            .map(i -> new OrderItem(i.productId(), i.quantity(), i.unitPrice()))
+            .map(i -> new CreateOrderUseCase.OrderItemInput(i.productId(), i.quantity()))
             .collect(Collectors.toSet());
 
         var input = new CreateOrderUseCase.Input(items, request.customerId());

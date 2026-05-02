@@ -1,7 +1,10 @@
 package io.mars.lite.api.chaos;
 
 import io.mars.lite.AbstractIntegrationTest;
+import io.mars.lite.domain.Product;
 import io.mars.lite.infrastructure.persistence.OrderJpaRepository;
+import io.mars.lite.infrastructure.persistence.ProductEntity;
+import io.mars.lite.infrastructure.persistence.ProductJpaRepository;
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
@@ -28,11 +32,21 @@ class ChaosControllerE2ETest extends AbstractIntegrationTest {
     @Autowired
     private OrderJpaRepository orderJpaRepository;
 
+    @Autowired
+    private ProductJpaRepository productJpaRepository;
+
+    private Product testProduct;
+
     @BeforeEach
     void setUp() {
         RestAssured.port = port;
         RestAssured.basePath = "";
         orderJpaRepository.deleteAll();
+        productJpaRepository.deleteAll();
+
+        // Create a test product for chaos tests
+        testProduct = Product.create("Chaos Test Product", new BigDecimal("149.95"));
+        productJpaRepository.save(ProductEntity.of(testProduct));
     }
 
     @Test
@@ -45,13 +59,12 @@ class ChaosControllerE2ETest extends AbstractIntegrationTest {
                     "customerId": "550e8400-e29b-41d4-a716-446655440000",
                     "items": [
                         {
-                            "productId": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-                            "quantity": 2,
-                            "unitPrice": 149.95
+                            "productId": "%s",
+                            "quantity": 2
                         }
                     ]
                 }
-                """)
+                """.formatted(testProduct.id()))
         .when()
             .post("/chaos/phantom-event")
         .then()
@@ -74,13 +87,12 @@ class ChaosControllerE2ETest extends AbstractIntegrationTest {
                     "customerId": "550e8400-e29b-41d4-a716-446655440000",
                     "items": [
                         {
-                            "productId": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-                            "quantity": 1,
-                            "unitPrice": 50.00
+                            "productId": "%s",
+                            "quantity": 1
                         }
                     ]
                 }
-                """)
+                """.formatted(testProduct.id()))
         .when()
             .post("/chaos/phantom-event")
         .then()
@@ -100,13 +112,12 @@ class ChaosControllerE2ETest extends AbstractIntegrationTest {
                     "customerId": "550e8400-e29b-41d4-a716-446655440000",
                     "items": [
                         {
-                            "productId": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-                            "quantity": 1,
-                            "unitPrice": 25.00
+                            "productId": "%s",
+                            "quantity": 1
                         }
                     ]
                 }
-                """)
+                """.formatted(testProduct.id()))
         .when()
             .post("/orders")
         .then()

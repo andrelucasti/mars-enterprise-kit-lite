@@ -1,6 +1,5 @@
 package io.mars.lite.api;
 
-import java.math.BigDecimal;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -17,17 +16,16 @@ public record CreateOrderRequest(
         }
     }
 
+    /**
+     * Order item request without price. Price comes from product catalog.
+     */
     public record ItemRequest(
         UUID productId,
-        int quantity,
-        BigDecimal unitPrice
+        int quantity
     ) {
         public ItemRequest {
             Objects.requireNonNull(productId, "productId cannot be null");
             if (quantity <= 0) throw new IllegalArgumentException("quantity must be positive");
-            Objects.requireNonNull(unitPrice, "unitPrice cannot be null");
-            if (unitPrice.compareTo(BigDecimal.ZERO) <= 0)
-                throw new IllegalArgumentException("unitPrice must be positive");
         }
     }
 }

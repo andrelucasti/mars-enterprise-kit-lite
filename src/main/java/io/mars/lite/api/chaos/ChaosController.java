@@ -1,7 +1,6 @@
 package io.mars.lite.api.chaos;
 
 import io.mars.lite.api.CreateOrderRequest;
-import io.mars.lite.domain.OrderItem;
 import io.mars.lite.domain.usecase.CreateOrderUseCase;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
@@ -28,7 +27,7 @@ public class ChaosController {
     public ResponseEntity<PhantomEventReport> simulatePhantomEvent(
             @RequestBody CreateOrderRequest request) {
         var items = request.items().stream()
-            .map(i -> new OrderItem(i.productId(), i.quantity(), i.unitPrice()))
+            .map(i -> new CreateOrderUseCase.OrderItemInput(i.productId(), i.quantity()))
             .collect(Collectors.toSet());
         var input = new CreateOrderUseCase.Input(items, request.customerId());
 
