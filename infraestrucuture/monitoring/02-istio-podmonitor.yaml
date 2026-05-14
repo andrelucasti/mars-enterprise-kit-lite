@@ -1,0 +1,61 @@
+# PodMonitor para sidecars Istio (istio-proxy) em qualquer namespace do mesh.
+# Cada Envoy expõe métricas em :15020/stats/prometheus (porta merged-metrics).
+# Doc oficial Istio: https://istio.io/latest/docs/ops/integrations/prometheus/
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: istio-sidecars
+  namespace: monitoring
+  labels:
+    app: istio-sidecars
+spec:
+  selector:
+    matchExpressions:
+      - key: istio-prometheus-ignore
+        operator: DoesNotExist
+  namespaceSelector:
+    any: true
+  podMetricsEndpoints:
+    # Istio 1.29 corre istio-proxy como native sidecar (initContainer com
+    # restartPolicy=Always), por isso o filtro "container_name=istio-proxy"
+    # NÃO funciona — Prometheus K8s SD só lista containers de spec.containers.
+    # Em vez disso: descobrimos por anotações `prometheus.io/*` que o
+    # mutating webhook do Istio injeta no pod.
+    - path: /stats/prometheus
+      interval: 30s
+      relabelings:
+        # 1) Só pods que pedem scrape (annotation injetada pelo Istio)
+        - sourceLabels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+          action: keep
+          regex: "true"
+        # 2) Reescrever __address__ para apontar à porta 15020 da anotação
+        - sourceLabels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+          action: replace
+          regex: (\d+\.\d+\.\d+\.\d+):\d+;(\d+)
+          replacement: $1:$2
+          targetLabel: __address__
+        # 3) Labels úteis para queries / dashboards
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+---
+# ServiceMonitor para istiod (control plane).
+# istiod expõe métricas em :15014/metrics.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: istiod
+  namespace: monitoring
+  labels:
+    app: istiod
+spec:
+  selector:
+    matchLabels:
+      app: istiod
+  namespaceSelector:
+    matchNames:
+      - istio-system
+  endpoints:
+    - port: http-monitoring     # nome do port no Service istiod (15014)
+      interval: 30s

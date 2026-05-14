@@ -1,0 +1,161 @@
+# kube-prometheus-stack — Mars Enterprise Kit Lite (LAB)
+#
+# Stack: Prometheus Operator + Prometheus + Grafana + Alertmanager
+# Cluster: Docker Desktop / kind / minikube (single-node local).
+# Namespace: monitoring-lab
+#
+# Install:
+#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm repo update
+#   kubectl create namespace monitoring-lab
+#   helm install kps prometheus-community/kube-prometheus-stack \
+#     -n monitoring-lab \
+#     -f infraestrucuture/monitoring/kube-prometheus-stack-values.yaml \
+#     --wait --timeout 10m
+#
+# Access Grafana:
+#   kubectl -n monitoring-lab port-forward svc/kps-grafana 3000:80
+#   open http://localhost:3000   (user: admin / pass: admin)
+#
+# WARNING: adminPassword=admin é INSEGURO. Apenas para uso em LAB local.
+# Não usar este values em produção.
+
+# ---------------------------------------------------------------------------
+# Prometheus Operator
+# ---------------------------------------------------------------------------
+prometheusOperator:
+  enabled: true
+  admissionWebhooks:
+    patch:
+      enabled: true
+  resources:
+    requests:
+      memory: 128Mi
+      cpu: 100m
+    limits:
+      memory: 256Mi
+      cpu: 500m
+
+# ---------------------------------------------------------------------------
+# Prometheus
+# ---------------------------------------------------------------------------
+prometheus:
+  enabled: true
+  prometheusSpec:
+    # CRÍTICO: descobrir ServiceMonitor/PodMonitor/Probe/Rule em QUALQUER
+    # namespace, independentemente da label do release. Sem isto o Prometheus
+    # só apanharia recursos com labels do próprio release.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+
+    # Watch ServiceMonitors etc. em todos os namespaces
+    serviceMonitorNamespaceSelector: {}
+    podMonitorNamespaceSelector: {}
+    probeNamespaceSelector: {}
+    ruleNamespaceSelector: {}
+
+    retention: 7d
+
+    resources:
+      requests:
+        memory: 512Mi
+        cpu: 100m
+      limits:
+        memory: 1536Mi
+        cpu: 1000m
+
+    # Storage emptyDir para lab — perde dados em restart. OK para PoC.
+    # Para persistir, definir storageSpec com volumeClaimTemplate.
+
+# ---------------------------------------------------------------------------
+# Grafana
+# ---------------------------------------------------------------------------
+grafana:
+  enabled: true
+  # LAB ONLY — inseguro em produção
+  adminPassword: admin
+
+  service:
+    type: ClusterIP
+    port: 80
+
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 200m
+    limits:
+      memory: 512Mi
+      cpu: 1000m
+
+  # Probes relaxadas — readiness default (timeoutSeconds=1) gerava timeout
+  # mesmo com CPU livre. Liveness com timeout 30s já era OK.
+  readinessProbe:
+    httpGet:
+      path: /api/health
+      port: 3000
+    initialDelaySeconds: 10
+    timeoutSeconds: 10
+    periodSeconds: 15
+    failureThreshold: 5
+
+  # Sem PVC — armazena dashboards em emptyDir. Lab.
+  persistence:
+    enabled: false
+
+  # Mantém datasource Prometheus default já configurado pelo chart
+  sidecar:
+    dashboards:
+      enabled: true
+      searchNamespace: ALL
+    datasources:
+      enabled: true
+
+# ---------------------------------------------------------------------------
+# Alertmanager
+# ---------------------------------------------------------------------------
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    resources:
+      requests:
+        memory: 64Mi
+        cpu: 50m
+      limits:
+        memory: 128Mi
+        cpu: 200m
+
+# ---------------------------------------------------------------------------
+# Default rules + cluster component scraping (necessário para dashboards
+# kube-prometheus default funcionarem out-of-the-box)
+# ---------------------------------------------------------------------------
+defaultRules:
+  create: true
+
+nodeExporter:
+  enabled: true
+kube-state-metrics:
+  enabled: true
+kubeStateMetrics:
+  enabled: true
+
+# Componentes core (alguns podem falhar em Docker Desktop — sem impacto crítico)
+kubeApiServer:
+  enabled: true
+kubelet:
+  enabled: true
+kubeControllerManager:
+  enabled: false   # não exposto em Docker Desktop
+coreDns:
+  enabled: true
+kubeDns:
+  enabled: false
+kubeEtcd:
+  enabled: false   # não exposto em Docker Desktop
+kubeScheduler:
+  enabled: false   # não exposto em Docker Desktop
+kubeProxy:
+  enabled: false   # não exposto em Docker Desktop
+windowsMonitoring:
+  enabled: false

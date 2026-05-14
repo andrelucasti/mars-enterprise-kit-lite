@@ -1,0 +1,20 @@
+# PeerAuthentication — política de mTLS para o namespace `mars`.
+#
+# Modo PERMISSIVE: pods do mesh aceitam tanto mTLS (entre sidecars) como
+# plain HTTP (de fora do mesh, ex: Kong). Essencial enquanto Kong não está
+# no mesh — sem isto o Kong→/orders seria recusado pelo sidecar do app.
+#
+# Quando elevar para STRICT:
+#   - Quando TODOS os emissores do tráfego para `mars` estiverem no mesh, OU
+#   - Quando Kong for adicionado ao mesh como cliente (sidecar no data plane,
+#     ou Kong configurado com mTLS upstream).
+#
+# Aplicar: kubectl apply -f 01-peer-authentication.yaml
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: mars
+spec:
+  mtls:
+    mode: PERMISSIVE

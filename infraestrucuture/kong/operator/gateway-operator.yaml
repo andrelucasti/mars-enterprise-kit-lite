@@ -6,11 +6,58 @@ metadata:
 spec:
   dataPlaneOptions:
     deployment:
+      # ----- PASSO 1 / HA -----
+      # 3 replicas eliminam o SPOF que existia com replicas=1. Em deploy /
+      # rolling update / node drain, há sempre ≥2 pods servindo.
+      # Custo aproximado: 3x recursos atuais até o passo 2 ajustar requests.
+      replicas: 3
       podTemplateSpec:
+        metadata:
+          # Label próprio (não-gerado pelo operator) para casar com o
+          # PodDisruptionBudget e o topologySpreadConstraints abaixo de forma
+          # estável — o label `app: kong-phcfh` é gerado e contém um sufixo
+          # imprevisível, então não serve como seletor declarativo.
+          labels:
+            app.kubernetes.io/component: kong-dataplane
         spec:
+          # Espalha os pods por nodes distintos. `ScheduleAnyway` (vs
+          # `DoNotSchedule`) é seguro para o lab: se o cluster perder workers
+          # e não houver 3 nodes disponíveis, o pod ainda agenda no mesmo
+          # node — preferimos disponibilidade a colocation rígida.
+          topologySpreadConstraints:
+            - maxSkew: 1
+              topologyKey: kubernetes.io/hostname
+              whenUnsatisfiable: ScheduleAnyway
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: kong-dataplane
           containers:
           - name: proxy
-            image: kong/kong:3.9
+            # Imagem custom com plugin OIDC pré-compilado (fork armeldemarsac).
+            # Baseada em Kong 3.7 — downgrade aceitável para PoC.
+            # Plugin: lua-resty-openidc embutido.
+            image: armeldemarsac/kong-oidc:4.0.0
+            env:
+            # --- Habilitar plugin OIDC ao lado dos bundled ---
+            # Sem isto Kong ignora o plugin mesmo estando instalado na imagem.
+            - name: KONG_PLUGINS
+              value: "bundled,oidc"
+            # --- Kong Manager OSS (read-only: o data plane do operator roda DB-less) ---
+            - name: KONG_ADMIN_GUI_LISTEN
+              value: "0.0.0.0:8002"
+            # URL pública do Kong Manager (MagicDNS do tailnet; troca p/ FQDN .ts.net se preciso).
+            # Porta 8002 = a porta exposta pelo service kong-manager (ver kong-manager-svc.yaml).
+            - name: KONG_ADMIN_GUI_URL
+              value: "http://kong-manager.tailf345b0.ts.net:8002"
+            # URL da Admin API tal como o BROWSER a alcança (mesmo node Tailscale, porta 8001).
+            - name: KONG_ADMIN_GUI_API_URL
+              value: "http://kong-manager.tailf345b0.ts.net:8001"
+            # O operator gere o listener mTLS da Admin API na 8444 p/ o control plane.
+            # Mantemos esse listener e acrescentamos um HTTP simples (8001) p/ o browser.
+            # ⚠️ Confirma o valor atual: kubectl -n kong exec deploy/<dataplane> -- env | grep KONG_ADMIN_LISTEN
+            #    e ajusta as flags do listener ssl se forem diferentes.
+            - name: KONG_ADMIN_LISTEN
+              value: "0.0.0.0:8444 http2 ssl, 0.0.0.0:8001"
     network:
       services:
         ingress:

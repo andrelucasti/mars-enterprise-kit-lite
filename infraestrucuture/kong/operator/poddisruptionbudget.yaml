@@ -1,0 +1,27 @@
+# PodDisruptionBudget — Kong DataPlane
+#
+# Garante que durante voluntary disruptions (node drain, kubectl delete pod,
+# rolling update do operator, upgrade do cluster) o Kong NUNCA fique com
+# menos de 2 pods saudáveis simultaneamente.
+#
+# Pareado com replicas=3 (gateway-operator.yaml) e topologySpreadConstraints:
+#   - replicas=3, minAvailable=2 → tolera 1 pod fora; bloqueia se vai cair 2.
+#
+# IMPORTANTE: PDB só protege contra disrupções VOLUNTÁRIAS (drain/delete).
+# Não protege contra crash, OOM, ou node morto subitamente — para isso
+# é replicas + spread.
+#
+# Seletor: usa o label `app.kubernetes.io/component: kong-dataplane` injetado via
+# podTemplateSpec.metadata.labels no GatewayConfiguration (não o label
+# `app: kong-phcfh` gerado dinamicamente, que muda se o Gateway for
+# recriado).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: kong-dataplane
+  namespace: kong
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: kong-dataplane

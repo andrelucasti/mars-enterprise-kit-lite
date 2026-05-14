@@ -1,0 +1,15 @@
+# Habilita injeção de sidecar Istio para todos os pods novos do namespace `mars`.
+#
+# Pods criados ANTES desta label NÃO recebem sidecar — precisam restart.
+# Pods criados DEPOIS recebem o sidecar `istio-proxy` automaticamente
+# (via MutatingWebhookConfiguration do istiod).
+#
+# Aplicar: kubectl apply -f 00-mars-namespace-injection.yaml
+# Verificar: kubectl get ns mars --show-labels
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mars
+  labels:
+    name: mars
+    istio-injection: enabled

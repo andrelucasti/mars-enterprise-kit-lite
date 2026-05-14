@@ -1,0 +1,21 @@
+{{- if .Values.istio.enabled }}
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: {{ include "mars.fullname" . }}
+  labels:
+    {{- include "mars.labels" . | nindent 4 }}
+spec:
+  host: {{ include "mars.fullname" . }}
+  trafficPolicy:
+    tls:
+      mode: {{ .Values.istio.destinationRule.tlsMode }}
+    {{- with .Values.istio.destinationRule.connectionPool }}
+    connectionPool:
+      tcp:
+        maxConnections: {{ .tcp.maxConnections }}
+      http:
+        http1MaxPendingRequests: {{ .http.http1MaxPendingRequests }}
+        http2MaxRequests: {{ .http.http2MaxRequests }}
+    {{- end }}
+{{- end }}

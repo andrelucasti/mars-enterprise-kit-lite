@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-tailscale
+  namespace: monitoring-lab
+  annotations:
+    tailscale.com/hostname: "grafana-lab"
+spec:
+  type: LoadBalancer
+  loadBalancerClass: tailscale
+  selector:
+    app.kubernetes.io/instance: kps
+    app.kubernetes.io/name: grafana
+  ports:
+  - name: http
+    port: 80
+    targetPort: 3000

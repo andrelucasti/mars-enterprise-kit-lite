@@ -39,9 +39,9 @@ existingSecretKey: "SPRING_DATASOURCE_PASSWORD"
 # Provide connection details for your external PostgreSQL instance.
 # Examples: AWS RDS, Cloud SQL, self-hosted PostgreSQL, etc.
 externalDatabase:
-  host: "local" # PostgreSQL hostname or IP
+  host: "100.94.93.48" # PostgreSQL hostname or IP
   port: 5432 # PostgreSQL port
-  database: "local" # Database name
+  database: "mars_lite_order" # Database name
   username: "mars" # Database username
 
 # =============================================================================
@@ -92,14 +92,25 @@ resources:
     memory: 1Gi
 
 # =============================================================================
+# Kong — Upstream healthchecks
+# =============================================================================
+# Aplica annotation `konghq.com/upstream-policy` no Service para que Kong
+# faça active/passive healthcheck. A KongUpstreamPolicy referenciada deve
+# existir no mesmo namespace (ver infraestrucuture/kong/mars/upstream-policy.yaml).
+# Deixar vazio/comentado para desativar.
+kong:
+  upstreamPolicy: mars-orders
+
+# =============================================================================
 # Monitoring — Prometheus ServiceMonitor
 # =============================================================================
 serviceMonitor:
-  enabled: false # Set to true if Prometheus Operator is installed
+  enabled: true # Set to true if Prometheus Operator is installed
   interval: 30s
   scrapeTimeout: 10s
   path: /actuator/prometheus
-  labels: {} # e.g., release: kube-prometheus-stack
+  labels:
+    release: kps # Match kube-prometheus-stack release name (best practice, even if selectors are open)
 
 # =============================================================================
 # OpenTelemetry — Auto-instrumentation
@@ -133,3 +144,33 @@ ingress:
         - path: /
           pathType: Prefix
   tls: []
+
+# =============================================================================
+# Istio (east-west: mesh routing + mTLS interno)
+# Ligar só quando o namespace estiver com sidecar injection
+# (`istio-injection=enabled`) e o istiod estiver instalado.
+# =============================================================================
+istio:
+  enabled: false
+
+  virtualService:
+    # Retry para 5xx + falhas de conexão. perTryTimeout × attempts deve
+    # caber dentro do `timeout` total.
+    retries:
+      attempts: 3
+      perTryTimeout: 2s
+      retryOn: "5xx,reset,connect-failure,refused-stream"
+    # Timeout total da request L7 vista pelo client mesh. Vazio = sem timeout.
+    timeout: 10s
+
+  destinationRule:
+    # ISTIO_MUTUAL: força mTLS quando o caller também está no mesh.
+    # DISABLE: plain HTTP. Usar enquanto Kong (fora do mesh) for o único caller.
+    tlsMode: ISTIO_MUTUAL
+    # Circuit-breaker básico. Limita pressão a montante em pico/colapso.
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 100
+        http2MaxRequests: 1000

@@ -1,0 +1,25 @@
+# O Gateway Operator cria uma NetworkPolicy (kong-<dataplane>-limit-admin-api-*) que SÓ
+# permite ingress nas portas 8444 (admin mTLS, vindo do operator), 8000/8443 (proxy) e 8100
+# (status). As portas 8001 (Admin API HTTP) e 8002 (Kong Manager GUI) ficam BLOQUEADAS.
+# NetworkPolicies são aditivas: esta política adiciona a permissão sem mexer na do operator.
+#
+# ⚠️ O podSelector usa o label `app: kong-phcfh`, gerado pelo operator a partir do nome do
+#    DataPlane. Se o Gateway/DataPlane for recriado, este valor muda — ver nota no fim do ficheiro.
+#    Re-derivar:  kubectl -n kong get pod -l app -o jsonpath='{.items[0].metadata.labels.app}'
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kong-manager-allow-gui
+  namespace: kong
+spec:
+  podSelector:
+    matchLabels:
+      app: kong-phcfh
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - port: 8002   # Kong Manager GUI
+          protocol: TCP
+        - port: 8001   # Admin API (HTTP) — leitura; o operator continua dono da config via 8444
+          protocol: TCP

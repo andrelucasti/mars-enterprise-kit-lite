@@ -1,0 +1,26 @@
+{{- if .Values.istio.enabled }}
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: {{ include "mars.fullname" . }}
+  labels:
+    {{- include "mars.labels" . | nindent 4 }}
+spec:
+  hosts:
+    - {{ include "mars.fullname" . }}
+  http:
+    - route:
+        - destination:
+            host: {{ include "mars.fullname" . }}
+            port:
+              number: {{ .Values.service.port }}
+      {{- with .Values.istio.virtualService.retries }}
+      retries:
+        attempts: {{ .attempts }}
+        perTryTimeout: {{ .perTryTimeout }}
+        retryOn: {{ .retryOn }}
+      {{- end }}
+      {{- with .Values.istio.virtualService.timeout }}
+      timeout: {{ . }}
+      {{- end }}
+{{- end }}

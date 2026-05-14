@@ -30,6 +30,214 @@ The diagram below shows the internal structure of the microservice — a single 
 | **infrastructure/** | Infrastructure layer. Implements domain ports (JPA adapter, Kafka publisher/consumer). Manages Flyway migrations. Depends on domain/ only. |
 | **api/** | HTTP entry point. Exposes REST endpoints, maps DTOs to domain objects. `OrderController` injects `CreateOrderUseCase` + `OrderRepository` directly — no service wrapper. Depends on domain/ ports only. |
 
+## Infrastructure Architecture — Cloud-Native Lab
+
+The **application** is intentionally Lite (single microservice, Dual Write anti-pattern, no Outbox). The **infrastructure around it**, however, is a full cloud-native lab demonstrating enterprise patterns: API gateway, identity provider, service mesh, observability stack, and zero-trust networking — all declarative, all versioned under `infraestrucuture/`.
+
+> Goal: let you experiment with the operational patterns of a real enterprise platform without needing a real enterprise to do it in.
+
+### Cluster topology
+
+```mermaid
+flowchart TB
+    User([User / Bruno via Tailscale])
+
+    subgraph TS["Tailscale tailnet (zero-trust edge)"]
+        TSGW["Kong proxy: kong-gateway.ts.net<br/>Keycloak: keycloak-lab.ts.net<br/>Grafana: grafana-lab.ts.net<br/>Kiali: kiali.ts.net"]
+    end
+
+    User --> TSGW
+
+    subgraph K8S["Kubernetes cluster (k3s, 4 nodes)"]
+        direction TB
+
+        subgraph KONG["namespace: kong"]
+            KongDP["Kong DataPlane<br/>(Gateway Operator)<br/>OpenResty/nginx"]
+            KongMgr["Kong Manager UI"]
+        end
+
+        subgraph ISTIO["namespace: istio-system"]
+            Istiod["istiod control plane"]
+            Kiali["Kiali"]
+        end
+
+        subgraph KC["namespace: keycloak"]
+            Keycloak["Keycloak<br/>realm: mars"]
+        end
+
+        subgraph MARS["namespace: mars (istio-injection=enabled)"]
+            App["mars-enterprise-kit-lite<br/>+ istio-proxy sidecar"]
+            PG[(PostgreSQL)]
+            Kafka["Redpanda (Kafka)"]
+        end
+
+        subgraph MON["namespace: monitoring-lab"]
+            Prom["Prometheus<br/>(kube-prometheus-stack)"]
+            Graf["Grafana"]
+            AM["Alertmanager"]
+        end
+
+        TSGW -->|north-south| KongDP
+        KongDP -->|HTTP/HTTPS| App
+        KongDP -->|OIDC introspect| Keycloak
+        App -->|JDBC| PG
+        App -->|produce/consume| Kafka
+
+        Prom -.->|scrape /metrics| KongDP
+        Prom -.->|scrape /stats/prometheus| App
+        Prom -.->|scrape :15014| Istiod
+        Prom -.->|scrape /actuator/prometheus| App
+        Kiali -->|PromQL| Prom
+        Graf -->|PromQL| Prom
+
+        Istiod -.->|inject sidecar + push xDS| App
+    end
+
+    classDef edge fill:#1f6feb,color:#fff,stroke:#0b3d91
+    classDef gw fill:#22863a,color:#fff,stroke:#0e4d1f
+    classDef mesh fill:#6f42c1,color:#fff,stroke:#3d1d80
+    classDef idp fill:#d29922,color:#000,stroke:#7a5800
+    classDef app fill:#cf222e,color:#fff,stroke:#7a131c
+    classDef obs fill:#0969da,color:#fff,stroke:#053b85
+    class TSGW edge
+    class KongDP,KongMgr gw
+    class Istiod,Kiali mesh
+    class Keycloak idp
+    class App,PG,Kafka app
+    class Prom,Graf,AM obs
+```
+
+### Components
+
+| Component | Namespace | Role | Manifests |
+|---|---|---|---|
+| **Kubernetes (k3s)** | — | Multi-node lab cluster (1 master + 3 workers) | — |
+| **Kong Gateway** | `kong` | North-south API gateway (auth, rate-limit, CORS, observability) | `infraestrucuture/kong/operator/` |
+| **Keycloak** | `keycloak` | Identity provider; realm `mars` issues bearer tokens for OIDC | `infraestrucuture/keycloak/` |
+| **Istio** | `istio-system` | East-west service mesh (mTLS, traffic policy, telemetry to Kiali) | `infraestrucuture/istio/` |
+| **Kiali** | `istio-system` | Mesh topology + traffic graph UI | `infraestrucuture/istio/02-kiali-tailscale-svc.yaml` |
+| **kube-prometheus-stack** | `monitoring-lab` | Prometheus Operator + Prometheus + Grafana + Alertmanager | `infraestrucuture/monitoring/kube-prometheus-stack-values.yaml` |
+| **Tailscale** | `tailscale` | Zero-trust edge — `LoadBalancer` services exposed only inside the tailnet | `*-tailscale-svc.yaml` files |
+| **App** | `mars` | The Order microservice itself, deployed via Helm chart | `helm/mars-enterprise-kit-lite/` |
+
+### North–South vs East–West
+
+The boundary is intentional: **Kong on the edge, Istio inside**. They do not overlap.
+
+```mermaid
+flowchart LR
+    Ext([External client]) -->|"1. HTTPS via Tailscale"| Kong
+    Kong -->|"2. OIDC introspect (Bearer)"| KC[Keycloak]
+    Kong -->|"3. plain HTTP to ClusterIP<br/>(north→south boundary)"| Sidecar
+
+    subgraph mars["mars namespace (mesh)"]
+        Sidecar["istio-proxy sidecar"] -->|"4. localhost → 8082"| App[Spring Boot app]
+        App -->|"5. east-west, mTLS via mesh"| Sidecar2["istio-proxy"]
+        Sidecar2 --> Other[other mesh service]
+    end
+
+    style Kong fill:#22863a,color:#fff
+    style KC fill:#d29922,color:#000
+    style Sidecar fill:#6f42c1,color:#fff
+    style Sidecar2 fill:#6f42c1,color:#fff
+    style App fill:#cf222e,color:#fff
+    style Other fill:#cf222e,color:#fff
+```
+
+| Direction | Tech | Why |
+|---|---|---|
+| **North-south** (client → cluster) | Kong Gateway | Plugin ecosystem (OIDC, rate-limit, CORS, ACL, key-auth), TLS termination, single entry point for external traffic |
+| **East-west** (service → service inside cluster) | Istio mesh | Automatic mTLS, fine-grained `AuthorizationPolicy`, retries/circuit-break per service, telemetry to Kiali |
+
+**Why Kong is NOT inside the mesh:** Kong is already a proxy (OpenResty/nginx). Adding `istio-proxy` sidecar would create **two user-space proxies on the same hop** — doubling latency and CPU while making two control planes fight over TLS, retries and observability. Standard pattern: **the mesh begins after the gateway**.
+
+### Kong Plugins
+
+All plugins are versioned as Kubernetes CRDs under `infraestrucuture/kong/plugins/` (cluster-wide) and `infraestrucuture/kong/oidc/` (per-route).
+
+| Plugin | Scope | Manifest | Purpose |
+|---|---|---|---|
+| `prometheus` | global (KongClusterPlugin) | `kong/plugins/prometheus.yaml` | Exposes `kong_http_requests_total`, `kong_request_latency_ms`, `kong_bandwidth_bytes`, `kong_upstream_target_health` on `:8100/metrics`. Kong 3.x requires per-category flags (`status_code_metrics`, `latency_metrics`, etc.) — all enabled in our config |
+| `oidc` | route `orders` (KongPlugin) | `kong/oidc/01-kongplugin-oidc-bearer.yaml` | Validates `Authorization: Bearer <jwt>` against Keycloak realm `mars` via token introspection. `bearer_only: yes` — stateless, no session cookie |
+| `cors` | route `orders` (KongPlugin) | `kong/plugins/cors.yaml` | Per-route CORS with `credentials: true` and explicit origin list (no wildcard) |
+
+**Upstream health** — `KongUpstreamPolicy` (`infraestrucuture/kong/mars/upstream-policy.yaml`) attached to the Service via `konghq.com/upstream-policy` annotation:
+- **Active probe**: GET `/actuator/health` every 10s; 3 failures → mark unhealthy
+- **Passive circuit-breaker**: 5 consecutive 5xx/timeouts → eject target
+- Status `healthy` reported in Grafana dashboard 7424
+
+### Observability stack
+
+```mermaid
+flowchart LR
+    subgraph SRC["Metric sources"]
+        AppMetrics["App<br/>/actuator/prometheus"]
+        Sidecar["istio-proxy<br/>:15020/stats/prometheus"]
+        Istiod[":15014/metrics"]
+        KongMet["Kong dataplane<br/>:8100/metrics"]
+        KSM["kube-state-metrics"]
+        Node["node-exporter"]
+    end
+
+    subgraph SCRAPE["Prometheus Operator (monitoring-lab)"]
+        ServMon["ServiceMonitor /<br/>PodMonitor CRDs"]
+        Prom[("Prometheus<br/>TSDB, 7d retention")]
+        ServMon --> Prom
+    end
+
+    subgraph UI["Visualization"]
+        Grafana
+        Kiali
+    end
+
+    AppMetrics --> ServMon
+    Sidecar --> ServMon
+    Istiod --> ServMon
+    KongMet --> ServMon
+    KSM --> ServMon
+    Node --> ServMon
+
+    Prom --> Grafana
+    Prom --> Kiali
+
+    Alert["Alertmanager"]
+    Prom --> Alert
+```
+
+| Source | Scraped via | Dashboard suggestion |
+|---|---|---|
+| **Spring Boot app** (`/actuator/prometheus`) | `ServiceMonitor` rendered by Helm chart (`serviceMonitor.enabled=true`) | JVM Micrometer, Spring HTTP, Kafka client |
+| **Istio sidecars** (`:15020/stats/prometheus`) | `PodMonitor envoy-stats` in `istio-system` | Istio Mesh Dashboard (7636), Kiali |
+| **Istio control plane** (`istiod :15014`) | `ServiceMonitor istiod` in `istio-system` | Istio Control Plane Dashboard |
+| **Kong dataplane** (`:8100/metrics`) | `PodMonitor kong-dataplane` in `kong` | Kong Official Dashboard (7424) |
+| **Kubernetes** (kube-state-metrics, node-exporter) | Bundled in kube-prometheus-stack | Kubernetes Cluster Dashboards |
+
+**Prometheus discovery is open:** all monitor selectors are `{}` (match-all) so any `ServiceMonitor`/`PodMonitor` in any namespace is picked up. The `release: kps` label is added by convention, not enforcement.
+
+### External access via Tailscale
+
+Instead of `Ingress` + `cert-manager` + DNS for a lab, every UI is exposed as a `LoadBalancer` with `loadBalancerClass: tailscale`. The Tailscale operator provisions a per-service hostname inside the tailnet:
+
+| Service | Hostname pattern | File |
+|---|---|---|
+| Kong proxy | `kong-gateway.<tailnet>.ts.net` | `kong/operator/` |
+| Keycloak | `keycloak-lab.<tailnet>.ts.net` | `keycloak/keycloak-tailscale-svc.yaml` |
+| Grafana | `grafana-lab.<tailnet>.ts.net` | `grafana-tailscale-svc.yaml` |
+| Kiali | `kiali.<tailnet>.ts.net` | `istio/02-kiali-tailscale-svc.yaml` |
+| Kong Manager | `kong-manager.<tailnet>.ts.net` | `kong/operator/kong-manager-svc.yaml` |
+
+Only devices logged into the tailnet reach them — no public exposure, no public DNS, no certificates to manage.
+
+### Trade-offs and known caveats
+
+- **Anti-pattern preserved:** the **app** still does Dual Write (DB → Kafka with no atomicity). The surrounding infra does not fix this — by design. The Transactional Outbox is the Pro version.
+- **`adminPassword: admin`** for Grafana, and OIDC `client_secret` hardcoded in `kong/oidc/`: lab-only. For production: Kong Vault (`{vault://env/...}`) or `configFrom.secretKeyRef`.
+- **No HPA, no PodDisruptionBudget, no NetworkPolicy** beyond the Kong Manager one. Lab simplicity.
+- **Prometheus storage is `emptyDir`** with 7-day retention — metrics evaporate on pod restart. Acceptable for a lab.
+- **Istio mesh has a single workload** (`mars`). The mesh is overkill for one service, but the wiring is realistic so you can add more services later.
+
+---
+
 ## Prerequisites
 
 Local execution requirements:

@@ -1,0 +1,21 @@
+# Service LoadBalancer adicional para expor o Kiali via Tailscale.
+# Não substitui o ClusterIP `kiali` criado pelo Helm — coexiste.
+# Hostname final: http://kiali.tailf345b0.ts.net:20001
+apiVersion: v1
+kind: Service
+metadata:
+  name: kiali-tailscale
+  namespace: istio-system
+  annotations:
+    tailscale.com/hostname: "kiali"
+    tailscale.com/expose: "true"
+    svccontroller.k3s.cattle.io/skipserviceproxy: "true"
+spec:
+  type: LoadBalancer
+  selector:
+    app: kiali
+  ports:
+    - name: http
+      port: 20001
+      targetPort: 20001
+      protocol: TCP

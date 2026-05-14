@@ -1,0 +1,29 @@
+# PodMonitor para o data plane do Kong.
+#
+# Porquê PodMonitor e não ServiceMonitor:
+# o Service `dataplane-ingress-kong-phcfh-pjf4s` só expõe a porta 8181 (proxy).
+# As métricas do Kong vivem na porta de status 8100 (KONG_STATUS_LISTEN),
+# que nenhum Service expõe. PodMonitor scrapa o pod directamente pelo
+# nome da porta `metrics`.
+#
+# Requer: KongClusterPlugin `prometheus` global aplicado
+#   kubectl apply -f infraestrucuture/kong/plugins/prometheus.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: kong-dataplane
+  namespace: monitoring
+  labels:
+    app: kong-dataplane
+spec:
+  namespaceSelector:
+    matchNames:
+      - kong
+  selector:
+    matchLabels:
+      app: kong-phcfh
+  podMetricsEndpoints:
+    - port: metrics            # porta nomeada do container (8100)
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong-manager
+  namespace: kong
+  annotations:
+    tailscale.com/hostname: "kong-manager"
+spec:
+  type: LoadBalancer
+  loadBalancerClass: tailscale
+  # ⚠️ Estes labels são gerados pelo Gateway Operator e mudam se o DataPlane for recriado.
+  # Re-derivar com:  kubectl -n kong get pod -l app -o jsonpath='{.items[0].metadata.labels}'
+  # (ou copiar do selector de  kubectl -n kong get svc dataplane-admin-... -o yaml)
+  selector:
+    app: kong-phcfh
+    gateway-operator.konghq.com/selector: 5197f7fa-3d6c-4ed8-a25e-a0e03291d254
+  ports:
+    - name: manager
+      port: 8002
+      targetPort: 8002
+    - name: admin
+      port: 8001
+      targetPort: 8001
+

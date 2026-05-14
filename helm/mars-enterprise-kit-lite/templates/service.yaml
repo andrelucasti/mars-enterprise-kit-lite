@@ -4,6 +4,10 @@ metadata:
   name: {{ include "mars.fullname" . }}
   labels:
     {{- include "mars.labels" . | nindent 4 }}
+  {{- with .Values.kong.upstreamPolicy }}
+  annotations:
+    konghq.com/upstream-policy: {{ . | quote }}
+  {{- end }}
 spec:
   type: {{ .Values.service.type }}
   ports:

@@ -1,0 +1,54 @@
+# KongUpstreamPolicy — Healthchecks ativo + passivo para mars-enterprise-kit-lite
+#
+# Por que: o dashboard 7424 mostra `state=healthchecks_off` para todos os
+# targets. Por default o Kong KIC não programa healthchecks — é preciso
+# associar uma KongUpstreamPolicy ao Service via annotation.
+#
+# Active vs Passive:
+# - Active: Kong sonda `/actuator/health` a cada 10s. Detecta pods caídos
+#   mesmo sem tráfego. Custo: +1 req a cada 10s por pod.
+# - Passive (circuit-breaker): Kong observa respostas REAIS. Marca target
+#   unhealthy após N falhas seguidas. Custo zero, mas precisa de tráfego.
+#
+# Como acoplar ao Service:
+#   kubectl annotate -n mars svc/mars-mars-enterprise-kit-lite \
+#     konghq.com/upstream-policy=mars-orders
+#
+# OU adicionar diretamente no Helm chart (helm/mars-enterprise-kit-lite/
+# templates/service.yaml) sob `.metadata.annotations`.
+apiVersion: configuration.konghq.com/v1beta1
+kind: KongUpstreamPolicy
+metadata:
+  name: mars-orders
+  namespace: mars
+spec:
+  algorithm: round-robin
+  healthchecks:
+    # ---------- ACTIVE: probe HTTP regular ----------
+    active:
+      type: http
+      httpPath: /actuator/health
+      timeout: 2          # segundos
+      concurrency: 2      # nº de threads do worker fazendo probes
+      healthy:
+        interval: 10      # probe a cada 10s quando saudável
+        successes: 2      # 2 probes OK → marca healthy
+        httpStatuses: [200]
+      unhealthy:
+        interval: 5       # probe a cada 5s quando degradado (mais agressivo)
+        httpFailures: 3   # 3 5xx seguidos → unhealthy
+        tcpFailures: 3
+        timeouts: 3
+        httpStatuses: [429, 500, 502, 503, 504]
+
+    # ---------- PASSIVE: circuit-breaker em tráfego real ----------
+    passive:
+      type: http
+      healthy:
+        successes: 5
+        httpStatuses: [200, 201, 204, 301, 302, 304, 401, 404]
+      unhealthy:
+        httpFailures: 5
+        tcpFailures: 3
+        timeouts: 3
+        httpStatuses: [429, 500, 502, 503, 504]
