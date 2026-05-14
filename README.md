@@ -484,9 +484,9 @@ Events that the order-service **consumes**:
 sequenceDiagram
     participant Client as Client
     participant API as OrderController
-    participant UC as "CreateOrderUseCase (@Transactional)"
+    participant UC as CreateOrderUseCase<br/>@Transactional
     participant DB as PostgreSQL
-    participant K as "Kafka (order.created)"
+    participant K as Kafka<br/>order.created
 
     Client->>API: POST /orders { customerId, items }
     API->>UC: execute(input)
@@ -503,7 +503,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant EXT as External System
-    participant K as "Kafka (order.cancelled)"
+    participant K as Kafka<br/>order.cancelled
     participant C as OrderCancelledConsumer
     participant UC as CancelOrderUseCase
     participant DB as PostgreSQL
@@ -521,8 +521,8 @@ sequenceDiagram
 sequenceDiagram
     participant CC as Claude Code
     participant DC as Docker Compose
-    participant API as "order-service (8082)"
-    participant K as "Redpanda (Kafka)"
+    participant API as order-service<br/>8082
+    participant K as Redpanda<br/>Kafka
     participant DB as PostgreSQL
 
     CC->>DC: docker compose up -d
@@ -628,11 +628,11 @@ docker-compose exec redpanda rpk topic consume order.created --num 1 --offset en
 sequenceDiagram
     participant Client as Client
     participant CC as ChaosController
-    participant SVC as "ChaosService (@Transactional)"
-    participant AOP as "PhantomEventChaosAspect (@Around)"
+    participant SVC as ChaosService<br/>@Transactional
+    participant AOP as PhantomEventChaosAspect<br/>@Around
     participant UC as CreateOrderUseCase
     participant DB as PostgreSQL
-    participant K as "Kafka (order.created)"
+    participant K as Kafka<br/>order.created
 
     Client->>CC: POST /chaos/phantom-event
     CC->>SVC: attemptPhantomOrder(input)
