@@ -1,6 +1,7 @@
 package io.mars.lite.domain.usecase;
 
 import io.mars.lite.domain.BusinessException;
+import io.mars.lite.domain.Order;
 import io.mars.lite.domain.OrderRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,10 +19,11 @@ public class CancelOrderUseCase {
     }
 
     @Transactional
-    public void execute(UUID orderId) {
+    public Order execute(UUID orderId) {
         var order = orderRepository.findById(orderId)
             .orElseThrow(() -> new BusinessException("Order not found: " + orderId));
         var cancelled = order.cancel();
         orderRepository.update(cancelled);
+        return cancelled;
     }
 }
